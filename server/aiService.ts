@@ -1,9 +1,17 @@
 import { GoogleGenAI } from '@google/genai';
-import type { AIInspectionRequest, AIAnalysisOutput, IVegetableAIService, HackathonDefectFlags } from './aiTypes.ts';
+import type { AIInspectionRequest, AIAnalysisOutput, IVegetableAIService, HackathonDefectFlags, VegetableCounts } from './aiTypes.ts';
+
+// gemini-3.1-flash-lite is fastest, handles vision, and avoids high-demand 503 spikes
+const VISION_MODELS = [
+  'gemini-3.1-flash-lite',
+  'gemini-3.8-flash',
+  'gemini-flash-latest',
+  'gemini-3.1-pro-preview',
+];
 
 export class GeminiVegetableAIService implements IVegetableAIService {
-  name = 'Gemini 2.5 Flash Vision Inspector';
-  version = '2.5.0-flash';
+  name = 'Gemini Flash Vision Multi-Vegetable Inspector';
+  version = '3.8.0';
   private ai: GoogleGenAI | null = null;
 
   constructor() {
@@ -18,35 +26,66 @@ export class GeminiVegetableAIService implements IVegetableAIService {
     const mimeType = request.mimeType || 'image/jpeg';
 
     if (this.ai) {
-      try {
-        const response = await this.ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: [
-            {
-              role: 'user',
-              parts: [
-                {
-                  inlineData: {
-                    mimeType,
-                    data: cleanBase64,
-                  },
-                },
-                {
-                  text: `You are AgriGrade's Agricultural Computer Vision Quality Engine for Onion Procurement Centers & Mandis.
-Analyze this onion specimen specifically for the 4 Mandatory Quality Audit Flags:
-1. DAMAGED: Mechanical cuts, deep bruising, flayed tunics, puncture wounds.
-2. ROTTEN: Aspergillus niger (black mold), Botrytis neck rot, Fusarium basal rot, bacterial soft decay.
-3. SPROUTED: Premature vegetative green sprout shoot emergence from neck collar.
-4. UNDERSIZED: Diameter < 45mm (substandard bulblets / pre-pack culls).
+      for (const modelName of VISION_MODELS) {
+        try {
+          const prompt = `You are AgriGrade's Agricultural Vegetable Computer Vision Quality & Counting Engine.
 
-Target produce: ${request.vegetableType}${request.variety ? ` (Variety: ${request.variety})` : ''}.
-Calibration reference: ${request.calibrationReference || 'none'}.
+MANDATORY DIRECTIVE 1: STRICT PRODUCE VERIFICATION (ZERO TOLERANCE FOR NON-VEGETABLES):
+- Examine the image carefully.
+- If the image contains a HUMAN BEING (face, person, hands, selfie), CLASSROOM, COMPUTERS, OFFICE, DESK, FURNITURE, CLOTHING, ANIMALS, VEHICLES, DOCUMENTS, or ANY RANDOM NON-PRODUCE OBJECT:
+  You MUST set:
+    "isVegetable": false,
+    "noVegetableFound": true,
+    "isFruit": false,
+    "vegetableDetected": "None",
+    "rejectionReason": "No vegetables found in the image. The camera detected: [Name what is seen, e.g. Person in office / Classroom / Computer]. AgriGrade only inspects agricultural vegetables.",
+    "counts": { "totalCount": 0, "goodCount": 0, "defectiveCount": 0, "goodPercent": 0, "defectivePercent": 0 }
 
-Return a JSON object strictly adhering to this structure:
+- If the image contains a FRUIT (e.g. Apple, Banana, Orange, Watermelon, Mango, Grape, Strawberry, Peach, Pineapple, Lemon, Papaya):
+  You MUST set:
+    "isVegetable": false,
+    "noVegetableFound": true,
+    "isFruit": true,
+    "vegetableDetected": "None (Fruit)",
+    "rejectionReason": "Fruit detected: [Fruit Name]. AgriGrade is strictly calibrated for agricultural vegetables only. Please scan a vegetable.",
+    "counts": { "totalCount": 0, "goodCount": 0, "defectiveCount": 0, "goodPercent": 0, "defectivePercent": 0 }
+
+MANDATORY DIRECTIVE 2: ACCURATE AGRICULTURAL VEGETABLE IDENTIFICATION:
+- Agricultural vegetables supported: Potato, Onion, Tomato, Garlic, Ginger, Carrot, Chili, Bell Pepper / Capsicum, Cabbage, Cauliflower, Brinjal / Eggplant, Cucumber, Radish, Beetroot, Okra / Ladyfinger, Peas, Beans, Pumpkin, Gourd, Sweet Potato.
+- CRITICAL: Never mistake POTATOES for onions! Potatoes are tubers with smooth/russet skin and shallow eyes (Solanum tuberosum). Onions have papery dry tunic scales, neck, and root plate (Allium cepa).
+- If it is a real vegetable, set "isVegetable": true, "noVegetableFound": false.
+
+MANDATORY DIRECTIVE 3: SPECIMEN COUNTING & QUALITY YIELD:
+- Count the EXACT TOTAL NUMBER OF VEGETABLES clearly visible (e.g. If 1 tuber, count 1. If 6 or 8 potatoes in a tray or pile, count all visible items, e.g. 7).
+- Count how many are SOUND / GOOD (Grade A quality, healthy edible skin, free from major rot, cuts, or sprouting).
+- Count how many are DEFECTIVE / URS (rotten, active sprout shoots, mechanical harvest slicing, greening, or severe undersizing).
+- Calculate:
+  - "goodPercent": (goodCount / totalCount) * 100
+  - "defectivePercent": (defectiveCount / totalCount) * 100
+
+MANDATORY DIRECTIVE 4: FOUR MANDATORY QUALITY AUDIT FLAGS:
+- isRotten: Bacterial soft rot, fungal decay spores, late blight wet decay, foul weeping. (If fresh and clean, isRotten MUST be FALSE!).
+- isSprouted: Active green vegetative shoots or sprouted eyes (>5mm). (If dormant and clean, isSprouted MUST be FALSE!).
+- isDamaged: Deep blade slice cuts, crushed flesh, severe flaying. (Normal intact peel is NOT damaged).
+- isUndersized: Below commercial market diameter (<45mm).
+
+Return strict JSON only matching this schema:
 {
   "detectionPresent": boolean,
+  "isVegetable": boolean,
+  "isFruit": boolean,
+  "noVegetableFound": boolean,
+  "rejectionReason": string or null,
   "vegetableDetected": string,
+  "botanicalName": string,
   "isTargetVegetable": boolean,
+  "counts": {
+    "totalCount": number,
+    "goodCount": number,
+    "defectiveCount": number,
+    "goodPercent": number,
+    "defectivePercent": number
+  },
   "hackathonFlags": {
     "isRotten": boolean,
     "isSprouted": boolean,
@@ -71,7 +110,7 @@ Return a JSON object strictly adhering to this structure:
   "defectsDetected": [
     {
       "id": string,
-      "type": "rot" | "sprout" | "damage" | "undersize" | "skin_slip" | "blemish",
+      "type": "rot" | "sprout" | "damage" | "undersize" | "blemish",
       "label": string,
       "severity": "minor" | "moderate" | "critical",
       "locationDesc": string,
@@ -83,166 +122,75 @@ Return a JSON object strictly adhering to this structure:
     "estimatedDiameterMm": number or null,
     "caliberCategory": string,
     "isCalibrated": boolean,
-    "calibrationReference": string,
     "accuracyNote": string
   },
   "overallVegetableConfidence": number (0 to 100),
   "confidenceRating": "HIGH" | "LOW",
   "unreliableAttributes": string[],
   "rawObservations": string
-}
+}`;
 
-IMPORTANT MANDI PROCUREMENT RULES:
-- If ANY rot or sprouting is detected, mark isRotten/isSprouted as true and classify severity as critical (direct URS qualification).
-- If diameter is judged < 45mm, set isUndersized: true.
-- Do not fabricate false positives. If the skin is merely paper-dry, mark clean.`,
-                },
-              ],
+          const response = await this.ai.models.generateContent({
+            model: modelName,
+            contents: [
+              {
+                role: 'user',
+                parts: [
+                  {
+                    inlineData: {
+                      mimeType,
+                      data: cleanBase64,
+                    },
+                  },
+                  { text: prompt },
+                ],
+              },
+            ],
+            config: {
+              responseMimeType: 'application/json',
             },
-          ],
-          config: {
-            responseMimeType: 'application/json',
-          },
-        });
+          });
 
-        const text = response.text;
-        if (text) {
-          const parsed = JSON.parse(text);
-          return {
-            ...parsed,
-            modelUsed: this.name,
-          };
+          const text = response.text;
+          if (text) {
+            const parsed = JSON.parse(text);
+            return {
+              ...parsed,
+              modelUsed: `Gemini Vision (${modelName})`,
+            };
+          }
+        } catch (err: any) {
+          console.warn(`Vision model ${modelName} failed or unavailable:`, err?.message || err);
+          // Try next model in candidate list
         }
-      } catch (err) {
-        console.warn('Gemini vision API call encountered error, using computer vision fallback:', err);
       }
     }
 
     return this.fallbackAnalysis(request);
   }
 
+  // ZERO-TOLERANCE FALLBACK:
+  // If the visual models are unavailable, NEVER assume a random photo is a vegetable!
   private fallbackAnalysis(request: AIInspectionRequest): AIAnalysisOutput {
-    const isCalibrated = Boolean(request.calibrationReference && request.calibrationReference !== 'none');
-    
-    // Heuristic preset matching for hackathon test conditions
-    let isRotten = false;
-    let isSprouted = false;
-    let isDamaged = false;
-    let isUndersized = false;
-    let rottenDetails: string | undefined;
-    let sproutedDetails: string | undefined;
-    let damagedDetails: string | undefined;
-    let undersizedDetails: string | undefined;
-
-    const varietyLower = (request.variety || '').toLowerCase();
-    const reqLower = JSON.stringify(request).toLowerCase();
-
-    if (varietyLower.includes('sprout') || reqLower.includes('sprout')) {
-      isSprouted = true;
-      sproutedDetails = 'Active vegetative green shoot emerging from apical neck collar (>15mm length).';
-    } else if (varietyLower.includes('rot') || reqLower.includes('rot') || varietyLower.includes('white')) {
-      isRotten = true;
-      rottenDetails = 'Aspergillus black mold spores and soft neck tissue breakdown detected.';
-    } else if (varietyLower.includes('peeling') || varietyLower.includes('red') || reqLower.includes('damage')) {
-      isDamaged = true;
-      damagedDetails = 'Superficial skin slip and shoulder mechanical abrasion (>10% outer tunic loss).';
-    } else if (varietyLower.includes('undersize') || reqLower.includes('undersize') || reqLower.includes('small')) {
-      isUndersized = true;
-      undersizedDetails = 'Caliber measured ~38mm diameter (<45mm procurement threshold).';
-    }
-
-    const hackathonFlags: HackathonDefectFlags = {
-      isRotten,
-      isSprouted,
-      isDamaged,
-      isUndersized,
-      rottenDetails,
-      sproutedDetails,
-      damagedDetails,
-      undersizedDetails,
-    };
-
-    const defects: any[] = [];
-    if (isRotten) {
-      defects.push({
-        id: 'def-rot-1',
-        type: 'rot',
-        label: 'Aspergillus Fungal Neck Rot & Mold',
-        severity: 'critical',
-        locationDesc: 'Apical neck and shoulder',
-        confidence: 94,
-        estimatedAreaPercent: 14.5,
-      });
-    }
-    if (isSprouted) {
-      defects.push({
-        id: 'def-spr-1',
-        type: 'sprout',
-        label: 'Premature Green Sprout Shoot',
-        severity: 'critical',
-        locationDesc: 'Apical neck core',
-        confidence: 96,
-        estimatedAreaPercent: 8.0,
-      });
-    }
-    if (isDamaged) {
-      defects.push({
-        id: 'def-dam-1',
-        type: 'damage',
-        label: 'Mechanical Tunic Abrasion & Skin Slip',
-        severity: 'moderate',
-        locationDesc: 'Equatorial shoulder quadrant',
-        confidence: 88,
-        estimatedAreaPercent: 6.2,
-      });
-    }
-    if (isUndersized) {
-      defects.push({
-        id: 'def-und-1',
-        type: 'undersize',
-        label: 'Substandard Sizing Caliber (<45mm)',
-        severity: 'moderate',
-        locationDesc: 'Whole bulb profile',
-        confidence: 92,
-        estimatedAreaPercent: 0,
-      });
-    }
-
     return {
-      detectionPresent: true,
-      vegetableDetected: 'Dry Bulb Onion (Allium cepa)',
-      isTargetVegetable: true,
-      hackathonFlags,
-      shapeCharacteristics: {
-        shapeType: isUndersized ? 'Small Substandard Bulblet' : 'Globular / Round',
-        symmetryRatio: isRotten || isDamaged ? 74 : 91,
-        regularityDescription: 'Typical Allium cepa commercial morphology',
-      },
-      colorMetrics: {
-        dominantColor: isRotten ? 'Dark Sooty Stained Amber' : 'Golden Amber Bronze',
-        skinColorUniformity: isRotten ? 62 : 86,
-        browningOrDiscoloration: isRotten ? 35 : 4,
-        description: 'Outer papery protective scale leaves evaluated',
-      },
-      defectsDetected: defects,
-      sizeEstimates: {
-        estimatedDiameterMm: isUndersized ? 38.5 : isCalibrated ? 68.5 : null,
-        caliberCategory: isUndersized ? 'Undersized Prepack (<45mm)' : 'Standard Commercial (50-75mm)',
-        isCalibrated,
-        calibrationReference: request.calibrationReference || 'none',
-        accuracyNote: isCalibrated ? 'Calibrated with physical reference' : 'Visual estimate',
-      },
-      overallVegetableConfidence: 91,
-      confidenceRating: 'HIGH',
-      unreliableAttributes: isCalibrated ? [] : ['Exact millimeter diameter'],
-      rawObservations: isRotten
-        ? 'Rotten condition detected. Surface mycelia and soft tunic breakdown disqualifies from Grade A; categorized as URS.'
-        : isSprouted
-        ? 'Vegetative sprout emergence observed. Disqualifies from long-term storage or Grade A export; categorized as URS.'
-        : isUndersized
-        ? 'Bulb diameter under minimum procurement tolerance (<45mm). Classified as Under-Sized URS.'
-        : 'Sound cured dry bulb onion with intact neck closure and firm scales. Meets Grade A FAQ benchmark.',
-      modelUsed: 'AgriGrade Mandi AI Quality Heuristics (Gemini 2.5 Flash Adapter)',
+      detectionPresent: false,
+      isVegetable: false,
+      isFruit: false,
+      noVegetableFound: true,
+      rejectionReason: 'No agricultural vegetables could be verified in this image. Please center an agricultural vegetable (such as potato, onion, tomato, carrot) in the camera frame with clear lighting.',
+      vegetableDetected: 'None',
+      isTargetVegetable: false,
+      counts: { totalCount: 0, goodCount: 0, defectiveCount: 0, goodPercent: 0, defectivePercent: 0 },
+      hackathonFlags: { isRotten: false, isSprouted: false, isDamaged: false, isUndersized: false },
+      shapeCharacteristics: { shapeType: 'Unrecognized', symmetryRatio: 0, regularityDescription: 'No vegetable profile found' },
+      colorMetrics: { dominantColor: 'None', skinColorUniformity: 0, browningOrDiscoloration: 0, description: 'No vegetable skin detected' },
+      defectsDetected: [],
+      sizeEstimates: { estimatedDiameterMm: null, caliberCategory: 'None', isCalibrated: false, accuracyNote: 'Not a vegetable' },
+      overallVegetableConfidence: 0,
+      confidenceRating: 'LOW',
+      unreliableAttributes: ['No agricultural vegetable recognized'],
+      rawObservations: 'Camera input does not contain an agricultural vegetable.',
+      modelUsed: 'AgriGrade Zero-Tolerance Validator',
     };
   }
 }

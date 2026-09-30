@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="500" height="500">
+  <defs>
+    <radialGradient id="forestBg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1A472A" />
+      <stop offset="100%" stop-color="#143A22" />
+    </radialGradient>
+    <linearGradient id="centerLeafDark" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#184D26" />
+      <stop offset="100%" stop-color="#1F5D2E" />
+    </linearGradient>
+    <linearGradient id="centerLeafLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#55A338" />
+      <stop offset="100%" stop-color="#3B8529" />
+    </linearGradient>
+    <linearGradient id="sideLeafGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#469230" />
+      <stop offset="100%" stop-color="#2D7224" />
+    </linearGradient>
+  </defs>
+
+  <rect width="500" height="500" fill="url(#forestBg)" rx="100" />
+  <circle cx="250" cy="250" r="195" fill="#F4EBDC" />
+  <circle cx="250" cy="250" r="180" fill="none" stroke="#F4EBDC" stroke-width="4" />
+
+  <!-- Left Leaf -->
+  <path d="M 68 200 C 60 270 120 370 236 415 C 238 350 215 275 110 220 Z" fill="url(#sideLeafGrad)" />
+
+  <!-- Right Leaf -->
+  <path d="M 432 200 C 440 270 380 370 264 415 C 262 350 285 275 390 220 Z" fill="url(#sideLeafGrad)" />
+
+  <!-- Center Leaf -->
+  <path d="M 248 310 C 230 270 195 220 220 160 C 240 120 280 80 340 60 C 310 120 290 190 250 310 Z" fill="url(#centerLeafDark)" />
+  <path d="M 340 60 C 365 110 350 200 275 260 C 248 282 248 310 248 310 C 290 190 310 120 340 60 Z" fill="url(#centerLeafLight)" />
+
+  <!-- Stem gap -->
+  <path d="M 236 415 Q 248 360 248 310 Q 252 360 264 415 Z" fill="#F4EBDC" />
+</svg>

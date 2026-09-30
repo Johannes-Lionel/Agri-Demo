@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 130" width="520" height="130">
+  <defs>
+    <!-- Dark Forest Green for "Agri" -->
+    <linearGradient id="agriGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1B4D29" />
+      <stop offset="100%" stop-color="#23492C" />
+    </linearGradient>
+    <!-- Bright Leaf Green for "grade" -->
+    <linearGradient id="gradeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#72B731" />
+      <stop offset="100%" stop-color="#64AA25" />
+    </linearGradient>
+    <!-- Leaf on the dot of "i" -->
+    <linearGradient id="leafGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2A6B37" />
+      <stop offset="100%" stop-color="#55A338" />
+    </linearGradient>
+  </defs>
+
+  <!-- Text Group -->
+  <!-- "Agr" -->
+  <text x="16" y="98" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-size="94" font-weight="900" fill="url(#agriGrad)" letter-spacing="-3">Agr</text>
+  
+  <!-- "i" stem without default dot -->
+  <rect x="228" y="44" width="16" height="54" rx="5" fill="url(#agriGrad)" />
+  
+  <!-- Stylized Green Leaf dot of the "i" tilted right matching user logo -->
+  <path d="M 235 34 C 230 18 245 8 256 6 C 257 22 245 32 235 34 Z" fill="url(#leafGrad)" />
+  <path d="M 235 34 Q 244 20 256 6" stroke="#FAF4EC" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.7" />
+
+  <!-- "grade" in bright green -->
+  <text x="250" y="98" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-size="94" font-weight="900" fill="url(#gradeGrad)" letter-spacing="-3">grade</text>
+</svg>

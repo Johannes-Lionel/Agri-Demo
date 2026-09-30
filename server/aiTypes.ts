@@ -51,10 +51,24 @@ export interface HackathonDefectFlags {
   undersizedDetails?: string;
 }
 
+export interface VegetableCounts {
+  totalCount: number;
+  goodCount: number;
+  defectiveCount: number;
+  goodPercent: number; // 0 to 100
+  defectivePercent: number; // 0 to 100
+}
+
 export interface AIAnalysisOutput {
   detectionPresent: boolean;
+  isVegetable: boolean;
+  isFruit: boolean;
+  noVegetableFound: boolean;
+  rejectionReason?: string;
   vegetableDetected: string;
+  botanicalName?: string;
   isTargetVegetable: boolean;
+  counts: VegetableCounts;
   shapeCharacteristics: ShapeMetrics;
   colorMetrics: ColorMetrics;
   defectsDetected: DefectObservation[];

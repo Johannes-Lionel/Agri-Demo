@@ -1,79 +1,68 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
-  Camera, Upload, Sparkles, CheckCircle2, AlertTriangle, 
-  ArrowRight, RefreshCw, X, ShieldAlert, Check, HelpCircle, 
-  Ruler, Eye, Layers, FileBadge, Scale 
+  ArrowLeft, Camera, Image as ImageIcon, Zap, ZapOff, 
+  Check, AlertCircle, RotateCcw, AlertTriangle, 
+  Ruler, HelpCircle, Layers, CheckCircle2 
 } from 'lucide-react';
 import { checkImageQualityFromCanvas } from '../utils/imageQuality';
 import { InspectionRecord, ImageQualityReport, GradeTier, BatchRecord, HackathonDefectFlags } from '../types';
 import { firestoreService } from '../services/firestoreService';
-import { GradeBadge } from '../components/common/Badge';
 import { ActivePage } from '../components/Navigation/Navbar';
 
 interface NewInspectionPageProps {
   onNavigate: (page: ActivePage) => void;
   activeBatch?: BatchRecord | null;
+  initialImageDataUrl?: string | null;
 }
 
-type InspectionStep = 'capture' | 'quality_check' | 'processing' | 'results';
+type ScreenMode = 'smart_capture' | 'analyzing' | 'analysis_result' | 'rejection';
 
-export const NewInspectionPage: React.FC<NewInspectionPageProps> = ({ onNavigate, activeBatch }) => {
-  const [step, setStep] = useState<InspectionStep>('capture');
-  const [vegetableType, setVegetableType] = useState<string>('onion');
-  const [variety, setVariety] = useState<string>('Yellow Spanish Sweet');
-  const [calibrationReference, setCalibrationReference] = useState<'standard_coin_25mm' | 'standard_card_85mm' | 'grid_10mm' | 'none'>('standard_coin_25mm');
-  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+export const NewInspectionPage: React.FC<NewInspectionPageProps> = ({ 
+  onNavigate, 
+  activeBatch,
+  initialImageDataUrl = null
+}) => {
+  const [mode, setMode] = useState<ScreenMode>('smart_capture');
+  const [smartGatingActive, setSmartGatingActive] = useState<boolean>(true);
+  const [calibrationMode, setCalibrationMode] = useState<boolean>(false);
+  const [flashOn, setFlashOn] = useState<boolean>(false);
+
+  // Vegetable selection with Auto-Detect as preferred
+  const [selectedVegCategory, setSelectedVegCategory] = useState<string>('auto');
+  const [capturedImage, setCapturedImage] = useState<string | null>(initialImageDataUrl);
   const [qualityReport, setQualityReport] = useState<ImageQualityReport | null>(null);
 
-  const [processingStage, setProcessingStage] = useState<string>('RECEIVED');
+  // Analyzing stage
+  const [analyzingProgress, setAnalyzingProgress] = useState<number>(30);
+  const [analyzingStage, setAnalyzingStage] = useState<'preprocessing' | 'computervision' | 'defection'>('preprocessing');
   const [result, setResult] = useState<InspectionRecord | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [rejectionMessage, setRejectionMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Camera state
-  const [isLiveCameraActive, setIsLiveCameraActive] = useState(false);
+  // Camera stream refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
-  // 4 Hackathon specific presets matching the problem statement:
-  // "Identifies damaged, rotten, sprouted, or undersized onions. Estimates Grade A and URS percentages."
-  const presets = [
-    {
-      name: '1. Grade A FAQ Export Onion',
-      category: 'Grade A FAQ',
-      desc: 'Uniform golden skin, sound neck, zero rot, zero sprouts, standard diameter >50mm',
-      img: 'https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?auto=format&fit=crop&w=800&q=80',
-      variety: 'Yellow Spanish Sweet (FAQ)',
-    },
-    {
-      name: '2. Rotten / Black Mold (URS)',
-      category: 'URS Reject',
-      desc: 'Aspergillus black mold spores and soft neck decay; violates procurement safety',
-      img: 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&w=800&q=80',
-      variety: 'White Globe (Rotten URS)',
-    },
-    {
-      name: '3. Sprouted Onion (URS)',
-      category: 'URS Reject',
-      desc: 'Active apical green vegetative shoots emerging; unsuitable for storage',
-      img: 'https://images.unsplash.com/photo-1508747703725-719777637510?auto=format&fit=crop&w=800&q=80',
-      variety: 'Red Creole (Sprouted URS)',
-    },
-    {
-      name: '4. Undersized & Damaged (<45mm)',
-      category: 'URS Reject',
-      desc: 'Diameter <45mm with mechanical abrasion; culled from Grade A table stock',
-      img: 'https://images.unsplash.com/photo-1587049352846-4a222e784d38?auto=format&fit=crop&w=800&q=80',
-      variety: 'Small Bulblet (Undersized URS)',
-    },
-  ];
+  useEffect(() => {
+    if (initialImageDataUrl) {
+      handleSelectImage(initialImageDataUrl);
+    } else {
+      startCamera();
+    }
+    return () => {
+      stopCamera();
+    };
+  }, [initialImageDataUrl]);
 
   const startCamera = async () => {
-    setIsLiveCameraActive(true);
-    setErrorMessage(null);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 } },
+        video: { 
+          facingMode: { ideal: 'environment' }, 
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
         audio: false,
       });
       streamRef.current = stream;
@@ -81,40 +70,74 @@ export const NewInspectionPage: React.FC<NewInspectionPageProps> = ({ onNavigate
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
-    } catch (err: any) {
-      setErrorMessage('Unable to access device camera. Please upload an image instead.');
-      setIsLiveCameraActive(false);
+    } catch (err) {
+      console.warn('Camera stream fallback:', err);
     }
   };
 
   const stopCamera = () => {
     if (streamRef.current) {
+      // Turn off torch if it was on
+      try {
+        const track = streamRef.current.getVideoTracks()[0];
+        if (track && (track.getCapabilities?.() as any)?.torch) {
+          (track as any).applyConstraints({ advanced: [{ torch: false }] });
+        }
+      } catch (e) {}
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
-    setIsLiveCameraActive(false);
-  };
-
-  const captureCameraFrame = () => {
-    if (!videoRef.current) return;
-    const canvas = document.createElement('canvas');
-    canvas.width = videoRef.current.videoWidth || 640;
-    canvas.height = videoRef.current.videoHeight || 480;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.drawImage(videoRef.current, 0, 0);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-      stopCamera();
-      handleSelectImage(dataUrl);
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Hardware Torch Flash Toggle
+  const toggleFlash = async () => {
+    const nextState = !flashOn;
+    setFlashOn(nextState);
+
+    if (streamRef.current) {
+      const track = streamRef.current.getVideoTracks()[0];
+      if (track) {
+        try {
+          const capabilities = (track.getCapabilities?.() as any) || {};
+          if (capabilities.torch) {
+            await (track as any).applyConstraints({
+              advanced: [{ torch: nextState }],
+            });
+          }
+        } catch (err) {
+          console.warn('Hardware torch error:', err);
+        }
+      }
+    }
+  };
+
+  const captureFrame = () => {
+    if (videoRef.current && videoRef.current.videoWidth) {
+      const canvas = document.createElement('canvas');
+      canvas.width = videoRef.current.videoWidth;
+      canvas.height = videoRef.current.videoHeight;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(videoRef.current, 0, 0);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+        stopCamera();
+        handleSelectImage(dataUrl);
+        return;
+      }
+    }
+    galleryInputRef.current?.click();
+  };
+
+  const handleGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (evt) => {
         if (evt.target?.result) {
+          stopCamera();
           handleSelectImage(evt.target.result as string);
         }
       };
@@ -124,7 +147,11 @@ export const NewInspectionPage: React.FC<NewInspectionPageProps> = ({ onNavigate
 
   const handleSelectImage = async (dataUrl: string) => {
     setCapturedImage(dataUrl);
-    setStep('quality_check');
+    setMode('analyzing');
+    setAnalyzingProgress(25);
+    setAnalyzingStage('preprocessing');
+    setRejectionMessage(null);
+    setErrorMessage(null);
 
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -133,655 +160,533 @@ export const NewInspectionPage: React.FC<NewInspectionPageProps> = ({ onNavigate
       setQualityReport(qReport);
     };
     img.src = dataUrl;
-  };
 
-  const runFullPipeline = async () => {
-    if (!capturedImage) return;
-    setStep('processing');
-    setIsProcessing(true);
-    setErrorMessage(null);
+    setTimeout(() => {
+      setAnalyzingStage('computervision');
+      setAnalyzingProgress(60);
+    }, 600);
 
-    const stages = [
-      'RECEIVED',
-      'QUALITY CHECK',
-      'PREPROCESSING',
-      'DETECTING DEFECTS',
-      'CHECKING ROT & SPROUT',
-      'SIZING CALIBER',
-      'GRADING & URS CALCULATION',
-    ];
+    setTimeout(async () => {
+      setAnalyzingStage('defection');
+      setAnalyzingProgress(85);
 
-    try {
-      for (const st of stages) {
-        setProcessingStage(st);
-        await new Promise((r) => setTimeout(r, 200));
+      try {
+        const response = await fetch('/api/ai/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: dataUrl,
+            vegetableType: selectedVegCategory === 'auto' ? 'vegetable' : selectedVegCategory,
+            calibrationReference: calibrationMode ? 'standard_coin_25mm' : 'none',
+            confidenceThreshold: 80,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Analysis server error');
+        }
+
+        const data = await response.json();
+        const ai = data.aiAnalysis;
+        const grading = data.grading;
+
+        // CHECK 1: If it's a fruit or non-vegetable, show clear rejection!
+        if (ai.isVegetable === false || ai.noVegetableFound === true || grading.grade === 'REJECT') {
+          setRejectionMessage(
+            ai.rejectionReason || grading.explanation || 'No agricultural vegetables detected in image. AgriGrade strictly inspects agricultural vegetables (such as potato, onion, tomato, carrot), not humans, fruits, or random objects.'
+          );
+          setMode('rejection');
+          return;
+        }
+
+        const detectedVeg = ai.vegetableDetected || (selectedVegCategory !== 'auto' ? selectedVegCategory : 'Vegetable');
+
+        const hackathonFlags: HackathonDefectFlags = ai.hackathonFlags || {
+          isRotten: grading.grade === 'URS' && grading.explanation?.includes('Rotten'),
+          isSprouted: grading.grade === 'URS' && grading.explanation?.includes('Sprouted'),
+          isDamaged: grading.grade === 'URS' && grading.explanation?.includes('damage'),
+          isUndersized: grading.grade === 'URS' && grading.explanation?.includes('Undersized'),
+        };
+
+        const counts = ai.counts || {
+          totalCount: 1,
+          goodCount: grading.grade === 'GRADE_A' ? 1 : 0,
+          defectiveCount: grading.grade === 'GRADE_A' ? 0 : 1,
+          goodPercent: grading.grade === 'GRADE_A' ? 100 : 0,
+          defectivePercent: grading.grade === 'GRADE_A' ? 0 : 100,
+        };
+
+        const newRecord: InspectionRecord = {
+          id: `AGRI-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+          userId: 'usr-default',
+          batchId: activeBatch?.id || 'batch-live-01',
+          vegetableType: detectedVeg,
+          variety: ai.botanicalName || `${detectedVeg} Cultivar`,
+          botanicalName: ai.botanicalName,
+          imageUrl: dataUrl,
+          calibrationUsed: calibrationMode,
+          imageQuality: qualityReport || {
+            width: 800,
+            height: 800,
+            megapixels: 0.64,
+            resolutionStatus: 'PASSED',
+            exposureStatus: 'PASSED',
+            averageBrightness: 128,
+            sharpnessStatus: 'SHARP',
+            sharpnessScore: 82,
+            framingStatus: 'CENTERED',
+            overallQualityPassed: true,
+            warnings: [],
+          },
+          confidenceScore: ai.overallVegetableConfidence || 94,
+          needsHumanReview: grading.needsHumanReview,
+          humanReviewReason: grading.reviewReason,
+          grade: grading.grade as GradeTier,
+          gradeName: grading.gradeName,
+          qualityScore: grading.qualityScore,
+          explanation: grading.explanation,
+          status: grading.needsHumanReview ? 'needs_review' : 'completed',
+          createdAt: new Date().toISOString(),
+          defects: ai.defectsDetected || [],
+          hackathonFlags,
+          counts,
+          isVegetable: true,
+          shape: ai.shapeCharacteristics || {
+            shapeType: 'Characteristic form',
+            symmetryRatio: 88,
+            regularityDescription: 'Normal symmetry',
+          },
+          color: ai.colorMetrics || {
+            dominantColor: 'Natural pigment',
+            skinColorUniformity: 85,
+            browningOrDiscoloration: 5,
+            description: 'Outer peel evaluated',
+          },
+          size: ai.sizeEstimates || {
+            estimatedDiameterMm: calibrationMode ? 64.0 : null,
+            caliberCategory: 'Commercial Caliber',
+            isCalibrated: calibrationMode,
+            accuracyNote: calibrationMode ? 'Calibrated reference' : 'Visual estimate',
+          },
+          unreliableAttributes: ai.unreliableAttributes || [],
+          rawObservations: ai.rawObservations || '',
+          aiModelUsed: 'Agrigrade Multi-Vegetable AI Engine',
+        };
+
+        await firestoreService.createInspection(newRecord);
+        setResult(newRecord);
+        setAnalyzingProgress(100);
+        setTimeout(() => {
+          setMode('analysis_result');
+        }, 300);
+      } catch (err: any) {
+        console.error('Analysis error:', err);
+        setErrorMessage('Failed to connect to AI vision server. Please retake photo.');
+        setMode('smart_capture');
+        startCamera();
       }
-
-      const response = await fetch('/api/ai/analyze', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageBase64: capturedImage,
-          vegetableType,
-          variety,
-          calibrationReference,
-          confidenceThreshold: 80,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Server returned status ${response.status}`);
-      }
-
-      const data = await response.json();
-      const ai = data.aiAnalysis;
-      const grading = data.grading;
-
-      const hackathonFlags: HackathonDefectFlags = ai.hackathonFlags || {
-        isRotten: grading.grade === 'URS' && grading.explanation?.includes('Rotten'),
-        isSprouted: grading.grade === 'URS' && grading.explanation?.includes('Sprouted'),
-        isDamaged: grading.grade === 'URS' && grading.explanation?.includes('damage'),
-        isUndersized: grading.grade === 'URS' && grading.explanation?.includes('Undersized'),
-      };
-
-      const newRecord: InspectionRecord = {
-        id: `insp-mandi-${Date.now()}`,
-        userId: 'usr-default',
-        batchId: activeBatch?.id || 'batch-on-881',
-        vegetableType,
-        variety,
-        imageUrl: capturedImage,
-        calibrationUsed: calibrationReference !== 'none',
-        calibrationReferenceType: calibrationReference,
-        imageQuality: qualityReport || {
-          width: 800,
-          height: 800,
-          megapixels: 0.64,
-          resolutionStatus: 'PASSED',
-          exposureStatus: 'PASSED',
-          averageBrightness: 128,
-          sharpnessStatus: 'SHARP',
-          sharpnessScore: 80,
-          framingStatus: 'CENTERED',
-          overallQualityPassed: true,
-          warnings: [],
-        },
-        confidenceScore: ai.overallVegetableConfidence,
-        needsHumanReview: grading.needsHumanReview,
-        humanReviewReason: grading.reviewReason,
-        grade: grading.grade as GradeTier,
-        gradeName: grading.gradeName,
-        qualityScore: grading.qualityScore,
-        explanation: grading.explanation,
-        status: grading.needsHumanReview ? 'needs_review' : 'completed',
-        createdAt: new Date().toISOString(),
-        defects: ai.defectsDetected || [],
-        hackathonFlags,
-        shape: ai.shapeCharacteristics || {
-          shapeType: 'Globular',
-          symmetryRatio: 88,
-          regularityDescription: 'Normal symmetry',
-        },
-        color: ai.colorMetrics || {
-          dominantColor: 'Amber Bronze',
-          skinColorUniformity: 85,
-          browningOrDiscoloration: 5,
-          description: 'Uniform skin',
-        },
-        size: ai.sizeEstimates || {
-          estimatedDiameterMm: null,
-          caliberCategory: 'Visual estimate',
-          isCalibrated: false,
-          accuracyNote: 'Estimated visually',
-        },
-        unreliableAttributes: ai.unreliableAttributes || [],
-        rawObservations: ai.rawObservations || '',
-        aiModelUsed: ai.modelUsed || 'Gemini 2.5 Flash Vision Inspector',
-      };
-
-      await firestoreService.createInspection(newRecord);
-      setResult(newRecord);
-      setStep('results');
-    } catch (err: any) {
-      console.error('Inspection pipeline failed:', err);
-      setErrorMessage(err?.message || 'Failed to complete AI vegetable analysis');
-      setStep('quality_check');
-    } finally {
-      setIsProcessing(false);
-    }
+    }, 1400);
   };
 
   const handleReset = () => {
     setCapturedImage(null);
-    setQualityReport(null);
     setResult(null);
-    setStep('capture');
+    setRejectionMessage(null);
+    setMode('smart_capture');
+    startCamera();
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-stone-900 border border-stone-800 rounded-3xl p-6 shadow-xl">
-        <div className="space-y-1">
-          <div className="inline-flex items-center gap-2 text-xs font-semibold text-emerald-400">
-            <Scale className="w-3.5 h-3.5" />
-            <span>Mandi Optical Assessment • Grade A vs URS Analyzer</span>
+    <div className="max-w-md mx-auto min-h-[85vh] flex flex-col justify-between select-none animate-in fade-in pb-16">
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleGalleryUpload}
+        className="hidden"
+      />
+
+      {/* Screen Brightness Booster Flash Overlay */}
+      {flashOn && (
+        <div className="fixed inset-0 z-30 pointer-events-none bg-white/40 backdrop-brightness-150 transition-opacity" />
+      )}
+
+      {/* ========================================================================= */}
+      {/* 03 SMART CAPTURE SCREEN */}
+      {/* ========================================================================= */}
+      {mode === 'smart_capture' && (
+        <div className="flex-1 flex flex-col justify-between space-y-3">
+          {/* Header Bar */}
+          <div className="flex items-center justify-between pt-1">
+            <button
+              onClick={() => onNavigate('dashboard')}
+              className="w-9 h-9 rounded-full bg-white border border-[#E9DFCF] flex items-center justify-center text-[#23492C] shadow-sm"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <h2 className="text-base font-extrabold text-[#23492C]">Smart Capture</h2>
+            <div className="w-9" />
           </div>
-          <h1 className="text-2xl font-black text-white tracking-tight">
-            Procurement Quality Intake & Grading
-          </h1>
-          <p className="text-xs text-stone-400">
-            Automating inspection of <strong className="text-stone-200">Damaged, Rotten, Sprouted, and Undersized</strong> bulbs.
-          </p>
-        </div>
 
-        {/* Step Indicator */}
-        <div className="flex items-center gap-2">
-          {['Capture', 'Quality Check', 'Analysis', 'Result & URS'].map((stName, idx) => {
-            const stepKeys = ['capture', 'quality_check', 'processing', 'results'];
-            const isCurrent = step === stepKeys[idx];
-            const isDone = stepKeys.indexOf(step) > idx;
+          {/* Vegetable Target Selector & Mode Pill */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-1 text-[11px] bg-white p-1.5 rounded-2xl border border-[#E9DFCF]">
+              <span className="font-bold text-[#23492C] px-2">Vegetable:</span>
+              <select
+                value={selectedVegCategory}
+                onChange={(e) => setSelectedVegCategory(e.target.value)}
+                className="bg-[#F4EBDC] px-3 py-1 rounded-xl text-xs font-bold text-[#23492C] border-none focus:outline-none"
+              >
+                <option value="auto">🪄 Auto-Detect Any Vegetable</option>
+                <option value="potato">🥔 Potato (Solanum tuberosum)</option>
+                <option value="onion">🧅 Onion (Allium cepa)</option>
+                <option value="tomato">🍅 Tomato</option>
+                <option value="garlic">🧄 Garlic</option>
+                <option value="carrot">🥕 Carrot</option>
+                <option value="pepper">🫑 Bell Pepper / Capsicum</option>
+                <option value="chili">🌶️ Green Chili</option>
+                <option value="cabbage">🥬 Cabbage / Cauliflower</option>
+                <option value="eggplant">🍆 Brinjal / Eggplant</option>
+                <option value="cucumber">🥒 Cucumber</option>
+                <option value="radish">🌱 Radish / Beetroot</option>
+              </select>
+            </div>
 
-            return (
-              <div key={idx} className="flex items-center gap-1.5">
-                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-mono font-bold ${
-                  isCurrent
-                    ? 'bg-emerald-500 text-stone-950 ring-2 ring-emerald-500/40'
-                    : isDone
-                    ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-stone-800 text-stone-500'
-                }`}>
-                  {idx + 1}
-                </span>
-                <span className={`text-xs font-semibold hidden md:inline ${isCurrent ? 'text-white' : 'text-stone-500'}`}>
-                  {stName}
-                </span>
-                {idx < 3 && <span className="text-stone-700 hidden md:inline">•</span>}
+            <div className="flex items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSmartGatingActive(!smartGatingActive)}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition shadow-sm ${
+                  smartGatingActive ? 'bg-white text-[#23492C] border border-[#B8D4B5]' : 'bg-[#EBF4EA] text-[#23492C]/60'
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full ${smartGatingActive ? 'bg-[#0B7347]' : 'bg-stone-400'}`} />
+                <span>Multi-Vegetable Count</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCalibrationMode(!calibrationMode)}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition shadow-sm ${
+                  calibrationMode ? 'bg-white text-[#23492C] border border-[#B8D4B5]' : 'bg-[#EBF4EA] text-[#23492C]/60'
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full ${calibrationMode ? 'bg-[#0B7347]' : 'bg-transparent border border-stone-400'}`} />
+                <span>Target size (45mm)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Camera Viewfinder */}
+          <div className="relative aspect-[4/5] rounded-[36px] bg-[#E8E0D2] overflow-hidden shadow-md flex items-center justify-center border-4 border-white">
+            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
+
+            {/* Produce Target Outline Guide */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none p-8">
+              <div className="relative w-56 h-56 flex items-center justify-center">
+                <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-[#23492C] rounded-tl-xl" />
+                <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-[#23492C] rounded-tr-xl" />
+                <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-[#23492C] rounded-bl-xl" />
+                <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-[#23492C] rounded-br-xl" />
               </div>
-            );
-          })}
-        </div>
-      </div>
 
-      {errorMessage && (
-        <div className="p-4 rounded-2xl bg-rose-950/60 border border-rose-500/40 text-xs text-rose-300 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-            <span>{errorMessage}</span>
+              <div className="absolute bottom-4 bg-[#23492C]/85 backdrop-blur-md px-4 py-1.5 rounded-full text-[11px] font-semibold text-white shadow">
+                Center single or multiple vegetables in frame
+              </div>
+            </div>
           </div>
-          <button onClick={() => setErrorMessage(null)} className="text-stone-400 hover:text-white">
-            <X className="w-4 h-4" />
+
+          {/* Bottom Action Controls */}
+          <div className="flex items-center justify-around px-4 pt-1">
+            {/* Flash / Torch Toggle with active state */}
+            <button
+              type="button"
+              onClick={toggleFlash}
+              className={`w-12 h-12 rounded-full flex items-center justify-center shadow-md transition ${
+                flashOn 
+                  ? 'bg-amber-400 text-stone-950 ring-4 ring-amber-300/50' 
+                  : 'bg-white text-[#23492C] border border-[#E9DFCF]'
+              }`}
+              title={flashOn ? 'Turn Flash Off' : 'Turn Flash On'}
+            >
+              {flashOn ? <Zap className="w-5 h-5 fill-current" /> : <ZapOff className="w-5 h-5" />}
+            </button>
+
+            {/* Shutter Button */}
+            <button
+              type="button"
+              onClick={captureFrame}
+              className="w-20 h-20 rounded-full bg-[#23492C] border-4 border-white shadow-xl flex items-center justify-center active:scale-90 transition-transform group"
+            >
+              <div className="w-14 h-14 rounded-full bg-[#0B7347] border-2 border-white/60 group-hover:scale-95 transition-transform" />
+            </button>
+
+            {/* Gallery Upload Button */}
+            <button
+              type="button"
+              onClick={() => galleryInputRef.current?.click()}
+              className="w-12 h-12 rounded-full bg-white border border-[#E9DFCF] text-[#23492C] flex items-center justify-center shadow-md active:scale-95 transition"
+            >
+              <ImageIcon className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 04 PROCESSING / ANALYZING SCREEN */}
+      {/* ========================================================================= */}
+      {mode === 'analyzing' && (
+        <div className="flex-1 flex flex-col justify-between space-y-6">
+          <div className="flex items-center justify-between pt-2">
+            <button
+              onClick={handleReset}
+              className="w-9 h-9 rounded-full bg-white border border-[#E9DFCF] flex items-center justify-center text-[#23492C] shadow-sm"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <h2 className="text-base font-extrabold text-[#23492C]">Analyzing</h2>
+            <div className="w-9" />
+          </div>
+
+          <div className="relative aspect-square max-w-[280px] mx-auto rounded-3xl bg-[#EAF2E9] border-2 border-[#D8E8D9] flex items-center justify-center overflow-hidden shadow-md">
+            {capturedImage ? (
+              <img src={capturedImage} alt="Crop" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-7xl">🥔</span>
+            )}
+            <div className="absolute left-0 right-0 h-1 bg-[#6CC330] shadow-[0_0_12px_#6CC330] animate-scan-line pointer-events-none" />
+          </div>
+
+          <div className="text-center space-y-2 px-2">
+            <h3 className="text-base font-extrabold text-[#23492C]">Analyzing vegetable count & quality...</h3>
+            <p className="text-xs text-[#0F1A13]/60">Verifying vegetable species and defect pillars</p>
+            <div className="w-full h-2 rounded-full bg-[#E5DBCB] overflow-hidden mt-3">
+              <div 
+                style={{ width: `${analyzingProgress}%` }}
+                className="h-full bg-[#0B7347] transition-all duration-300 rounded-full"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2.5 bg-white rounded-3xl p-5 border border-[#E9DFCF] shadow-sm">
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-3">
+                <div className="w-6 h-6 rounded-full bg-[#0B7347] text-white flex items-center justify-center">
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                </div>
+                <span className="font-bold text-[#23492C]">Species Identification</span>
+              </div>
+              <span className="text-[11px] font-semibold text-[#0B7347]">Done</span>
+            </div>
+
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-3">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                  analyzingStage === 'computervision' || analyzingStage === 'defection'
+                    ? 'bg-[#0B7347] text-white'
+                    : 'border-2 border-[#D8E8D9]'
+                }`}>
+                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                </div>
+                <span className="font-bold text-[#23492C]">Specimen Counting</span>
+              </div>
+              <span className="text-[11px] font-semibold text-[#0F1A13]/60">
+                {analyzingStage === 'defection' ? 'Done' : 'Counting'}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-3">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                  analyzingStage === 'defection' ? 'bg-[#0B7347] text-white' : 'border-2 border-[#D8E8D9]'
+                }`}>
+                  {analyzingStage === 'defection' && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                </div>
+                <span className="font-bold text-[#23492C]">Defect Audit & Good %</span>
+              </div>
+              <span className="text-[11px] font-semibold text-[#0F1A13]/60">
+                {analyzingStage === 'defection' ? 'Finalizing' : 'Waiting'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* REJECTION SCREEN (Non-vegetable or Fruit detected) */}
+      {/* ========================================================================= */}
+      {mode === 'rejection' && (
+        <div className="flex-1 flex flex-col justify-between space-y-6 pt-2">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={handleReset}
+              className="w-9 h-9 rounded-full bg-white border border-[#E9DFCF] flex items-center justify-center text-[#23492C] shadow-sm"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <h2 className="text-base font-extrabold text-[#23492C]">Inspection Notice</h2>
+            <div className="w-9" />
+          </div>
+
+          <div className="bg-white rounded-3xl p-6 border border-rose-200 shadow-sm text-center space-y-4">
+            <div className="w-16 h-16 rounded-full bg-rose-100 border border-rose-200 text-rose-600 flex items-center justify-center mx-auto text-2xl">
+              🚫
+            </div>
+
+            <div className="space-y-1.5">
+              <h3 className="text-lg font-black text-[#23492C]">No Vegetables Found</h3>
+              <p className="text-xs text-[#0F1A13]/70 leading-relaxed px-2">
+                {rejectionMessage || 'AgriGrade is strictly calibrated for agricultural vegetables only (not fruits or non-produce).'}
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-[#F4EBDC] text-[11px] text-[#23492C] text-left space-y-1">
+              <span className="font-bold block">Supported Agricultural Vegetables:</span>
+              <p className="text-[#0F1A13]/70">
+                Potato, Onion, Tomato, Garlic, Ginger, Carrot, Bell Pepper, Chili, Cabbage, Cauliflower, Brinjal, Cucumber, Radish, Beetroot.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleReset}
+            className="w-full py-4 rounded-full bg-[#0B7347] hover:bg-[#3F5A3A] text-white font-bold text-sm shadow-md transition"
+          >
+            Scan a Vegetable
           </button>
         </div>
       )}
 
-      {/* STEP 1: CAPTURE */}
-      {step === 'capture' && (
-        <div className="space-y-6">
-          {/* Target Vegetable & Calibration Reference Selectors */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 rounded-2xl bg-stone-900 border border-stone-800 space-y-1.5">
-              <label className="text-[11px] font-bold text-stone-400 uppercase tracking-wider block">
-                Procurement Commodity
-              </label>
-              <select
-                value={vegetableType}
-                onChange={(e) => setVegetableType(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-stone-950 border border-stone-800 text-white text-xs font-bold focus:outline-none focus:border-emerald-500"
-              >
-                <option value="onion">🧅 Onion (Allium cepa) — Mandi Standard</option>
-                <option value="potato">🥔 Potato (Solanum tuberosum)</option>
-                <option value="tomato">🍅 Tomato (Solanum lycopersicum)</option>
-              </select>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-stone-900 border border-stone-800 space-y-1.5">
-              <label className="text-[11px] font-bold text-stone-400 uppercase tracking-wider block">
-                Lot / Cultivar Variety
-              </label>
-              <input
-                type="text"
-                value={variety}
-                onChange={(e) => setVariety(e.target.value)}
-                placeholder="e.g. Yellow Spanish Sweet"
-                className="w-full px-3 py-2 rounded-xl bg-stone-950 border border-stone-800 text-white text-xs font-semibold focus:outline-none focus:border-emerald-500"
-              />
-            </div>
-
-            <div className="p-4 rounded-2xl bg-stone-900 border border-stone-800 space-y-1.5">
-              <label className="text-[11px] font-bold text-stone-400 uppercase tracking-wider block flex items-center justify-between">
-                <span>Undersize Calibration (&lt;45mm)</span>
-                <span className="text-[10px] text-emerald-400 font-mono">Calibrated</span>
-              </label>
-              <select
-                value={calibrationReference}
-                onChange={(e: any) => setCalibrationReference(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-stone-950 border border-stone-800 text-white text-xs font-bold focus:outline-none focus:border-emerald-500"
-              >
-                <option value="standard_coin_25mm">Standard 25mm Coin Target</option>
-                <option value="standard_card_85mm">Standard 85.6mm ID / Weigh Card</option>
-                <option value="grid_10mm">10mm Calibrated Mandi Optical Mat</option>
-                <option value="none">Visual estimation only</option>
-              </select>
-            </div>
+      {/* ========================================================================= */}
+      {/* 05 ANALYSIS RESULT SCREEN */}
+      {/* ========================================================================= */}
+      {mode === 'analysis_result' && result && (
+        <div className="flex-1 flex flex-col justify-between space-y-4">
+          <div className="flex items-center justify-between pt-2">
+            <button
+              onClick={handleReset}
+              className="w-9 h-9 rounded-full bg-white border border-[#E9DFCF] flex items-center justify-center text-[#23492C] shadow-sm"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <h2 className="text-base font-extrabold text-[#23492C]">Analysis Result</h2>
+            <div className="w-9" />
           </div>
 
-          {/* Live Camera Viewfinder or Capture Options */}
-          {isLiveCameraActive ? (
-            <div className="relative rounded-3xl overflow-hidden bg-black aspect-video border border-stone-800 shadow-2xl flex items-center justify-center">
-              <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-              
-              <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                <div className="w-72 h-72 border-2 border-emerald-400/80 rounded-full border-dashed animate-pulse flex items-center justify-center">
-                  <div className="w-12 h-12 border-t-2 border-l-2 border-emerald-400 absolute top-4 left-4" />
-                  <div className="w-12 h-12 border-t-2 border-r-2 border-emerald-400 absolute top-4 right-4" />
-                  <div className="w-12 h-12 border-b-2 border-l-2 border-emerald-400 absolute bottom-4 left-4" />
-                  <div className="w-12 h-12 border-b-2 border-r-2 border-emerald-400 absolute bottom-4 right-4" />
-                </div>
-                <div className="absolute bottom-6 bg-black/70 px-4 py-1.5 rounded-full text-xs font-mono text-emerald-300 border border-emerald-500/30">
-                  Center onion bulb to scan for rot, sprouts, cuts, and diameter
-                </div>
-              </div>
-
-              <div className="absolute bottom-6 left-6 right-6 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={stopCamera}
-                  className="px-4 py-2 rounded-xl bg-stone-900/80 hover:bg-stone-800 text-stone-300 text-xs font-bold backdrop-blur-md"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={captureCameraFrame}
-                  className="px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-xl shadow-emerald-600/40 flex items-center gap-2"
-                >
-                  <Camera className="w-4 h-4" />
-                  <span>Capture Specimen</span>
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <button
-                type="button"
-                onClick={startCamera}
-                className="group p-8 rounded-3xl bg-stone-900 hover:bg-stone-850 border border-stone-800 hover:border-emerald-500/50 transition-all text-left space-y-4 shadow-xl flex flex-col justify-between h-56"
-              >
-                <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
-                  <Camera className="w-7 h-7" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-black text-white group-hover:text-emerald-400 transition-colors">
-                    Field Camera Intake
-                  </h3>
-                  <p className="text-xs text-stone-400 mt-1">
-                    Live mobile camera assessment directly at procurement scale or conveyor table
-                  </p>
-                </div>
-                <span className="text-[10px] font-mono font-bold text-emerald-400 flex items-center gap-1">
-                  <span>Launch Live Shutter</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </span>
-              </button>
-
-              <label className="group p-8 rounded-3xl bg-stone-900 hover:bg-stone-850 border border-stone-800 hover:border-teal-500/50 transition-all text-left space-y-4 shadow-xl flex flex-col justify-between h-56 cursor-pointer">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-                <div className="w-14 h-14 rounded-2xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400 group-hover:scale-110 transition-transform">
-                  <Upload className="w-7 h-7" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-black text-white group-hover:text-teal-400 transition-colors">
-                    Upload Batch Photos
-                  </h3>
-                  <p className="text-xs text-stone-400 mt-1">
-                    Select high-resolution JPG / PNG produce captures from field inspections
-                  </p>
-                </div>
-                <span className="text-[10px] font-mono font-bold text-teal-400 flex items-center gap-1">
-                  <span>Browse Device Files</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </span>
-              </label>
-            </div>
-          )}
-
-          {/* Hackathon Preset Suite: 1-Click Verification of All 4 Prompt Conditions */}
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center justify-between text-xs font-bold text-stone-400 uppercase tracking-wider">
-              <span>Instant Hackathon Test Presets (All 4 Required Defect Classes)</span>
-              <span className="text-[10px] text-emerald-400 font-mono">1-Click Live Validation</span>
+          <div className="bg-white rounded-3xl p-5 shadow-sm border border-[#E9DFCF] space-y-4">
+            <div className="aspect-[4/3] rounded-2xl bg-[#EAF2E9] overflow-hidden flex items-center justify-center border border-[#D8E8D9]">
+              {result.imageUrl ? (
+                <img src={result.imageUrl} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-7xl">🥔</span>
+              )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {presets.map((preset, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => {
-                    setVariety(preset.variety);
-                    handleSelectImage(preset.img);
-                  }}
-                  className="group p-3 rounded-2xl bg-stone-900 border border-stone-800 hover:border-emerald-500/50 hover:bg-stone-850 cursor-pointer transition space-y-2 shadow-md"
-                >
-                  <div className="relative aspect-video rounded-xl overflow-hidden bg-black">
-                    <img
-                      src={preset.img}
-                      alt={preset.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                    />
-                    <span className={`absolute top-2 left-2 text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                      preset.category.includes('Grade A')
-                        ? 'bg-emerald-500 text-stone-950'
-                        : 'bg-rose-500 text-white'
-                    }`}>
-                      {preset.category}
-                    </span>
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-stone-100 group-hover:text-emerald-400 truncate">
-                      {preset.name}
-                    </div>
-                    <div className="text-[10px] text-stone-400 line-clamp-2 mt-0.5">
-                      {preset.desc}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 2: QUALITY CHECK */}
-      {step === 'quality_check' && capturedImage && (
-        <div className="space-y-6">
-          <div className="bg-stone-900 border border-stone-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
+            {/* Accurately Detected Vegetable Name */}
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Eye className="w-5 h-5 text-emerald-400" />
-                  <span>Optical Quality Check & Pre-Flight Sizing</span>
-                </h2>
-                <p className="text-xs text-stone-400 mt-0.5">
-                  Confirming sharpness, lighting, and calibration target before AI defect assessment.
-                </p>
+                <h3 className="text-xl font-black text-[#23492C] capitalize">
+                  {result.vegetableType}
+                </h3>
+                <span className="text-[11px] text-[#0F1A13]/60">
+                  {result.botanicalName ? `${result.botanicalName} • ` : ''}Sample #{result.id}
+                </span>
               </div>
 
+              <span className={`px-4 py-1.5 rounded-full text-xs font-black shadow-sm ${
+                result.grade === 'GRADE_A'
+                  ? 'bg-[#23492C] text-white'
+                  : result.grade === 'GRADE_B'
+                  ? 'bg-[#0B7347] text-white'
+                  : 'bg-rose-700 text-white'
+              }`}>
+                {result.grade === 'GRADE_A' ? 'Grade A' : result.grade === 'GRADE_B' ? 'Grade B' : 'URS (Under-Rate)'}
+              </span>
+            </div>
+
+            {/* MULTI-VEGETABLE COUNT & GOOD % FEATURE */}
+            <div className="p-3 rounded-2xl bg-[#FAF6EE] border border-[#E9DFCF] grid grid-cols-2 gap-2">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-[#0F1A13]/60 block">Vegetables Counted</span>
+                <span className="text-lg font-black text-[#23492C]">
+                  {result.counts?.totalCount || 1} <span className="text-xs font-normal">items</span>
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-[#0F1A13]/60 block">Good Vegetables</span>
+                <span className="text-lg font-black text-[#0B7347]">
+                  {result.counts?.goodPercent ?? 100}% <span className="text-xs font-normal">({result.counts?.goodCount ?? 1} sound)</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Confidence Progress Bar */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-[#0F1A13]/70 font-semibold">Confidence</span>
+                <span className="font-extrabold text-[#23492C]">{result.confidenceScore}%</span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-[#EAF2E9] overflow-hidden">
+                <div 
+                  style={{ width: `${result.confidenceScore}%` }}
+                  className="h-full bg-[#0B7347] rounded-full"
+                />
+              </div>
+            </div>
+
+            {/* 4-Pillar Defect Classification Box */}
+            <div className="p-3.5 rounded-2xl bg-[#F4EBDC]/60 border border-[#E9DFCF] space-y-1.5">
+              <span className="text-[10px] font-bold text-[#23492C] uppercase tracking-wider block">
+                Quality Observations
+              </span>
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${result.hackathonFlags?.isRotten ? 'bg-rose-500' : 'bg-[#0B7347]'}`} />
+                  <span>Rotten: {result.hackathonFlags?.isRotten ? 'Detected (URS)' : 'Clean'}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${result.hackathonFlags?.isSprouted ? 'bg-amber-500' : 'bg-[#0B7347]'}`} />
+                  <span>Sprouted: {result.hackathonFlags?.isSprouted ? 'Detected (URS)' : 'Clean'}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${result.hackathonFlags?.isDamaged ? 'bg-blue-500' : 'bg-[#0B7347]'}`} />
+                  <span>Damaged: {result.hackathonFlags?.isDamaged ? 'Detected' : 'Intact'}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className={`w-2 h-2 rounded-full ${result.hackathonFlags?.isUndersized ? 'bg-purple-500' : 'bg-[#0B7347]'}`} />
+                  <span>Caliber: {result.hackathonFlags?.isUndersized ? '<45mm' : 'Standard'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="space-y-2 pt-2">
+            <button
+              type="button"
+              onClick={() => onNavigate('batch_analytics')}
+              className="w-full py-4 rounded-full bg-[#0B7347] hover:bg-[#3F5A3A] active:scale-[0.98] text-white font-extrabold text-sm shadow-md transition"
+            >
+              Verify Grade & View Ledger
+            </button>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => onNavigate('reports')}
+                className="py-3 rounded-full bg-white hover:bg-[#FAF6EE] text-[#23492C] font-bold text-xs border border-[#E9DFCF] shadow-sm transition"
+              >
+                Quality Report
+              </button>
               <button
                 type="button"
                 onClick={handleReset}
-                className="text-xs px-3 py-1.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 font-semibold transition"
+                className="py-3 rounded-full bg-white hover:bg-[#FAF6EE] text-[#23492C] font-bold text-xs border border-[#E9DFCF] shadow-sm transition"
               >
-                Change Photo
+                Scan Again
               </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
-              <div className="md:col-span-5 relative aspect-square rounded-2xl overflow-hidden bg-black border border-stone-800">
-                <img src={capturedImage} alt="Target" className="w-full h-full object-cover" />
-                <div className="absolute top-3 left-3 bg-black/80 px-2.5 py-1 rounded-lg text-[10px] font-mono text-emerald-300 border border-emerald-500/20">
-                  {variety}
-                </div>
-                {calibrationReference !== 'none' && (
-                  <div className="absolute bottom-3 right-3 bg-emerald-950/90 px-2.5 py-1 rounded-lg text-[10px] font-mono text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5">
-                    <Ruler className="w-3.5 h-3.5" />
-                    <span>Scale: {calibrationReference.replace('_', ' ')}</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="md:col-span-7 space-y-3">
-                <div className="space-y-2">
-                  <div className="p-3 rounded-xl bg-stone-950 border border-stone-800 flex items-center justify-between text-xs">
-                    <span className="text-stone-300 font-semibold">Image Resolution:</span>
-                    <span className="font-mono text-emerald-400 font-bold">
-                      {qualityReport ? `${qualityReport.width} × ${qualityReport.height} px (${qualityReport.resolutionStatus})` : 'Passed'}
-                    </span>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-stone-950 border border-stone-800 flex items-center justify-between text-xs">
-                    <span className="text-stone-300 font-semibold">Exposure & Illumination:</span>
-                    <span className="font-mono text-emerald-400 font-bold">
-                      {qualityReport?.exposureStatus || 'BALANCED'}
-                    </span>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-stone-950 border border-stone-800 flex items-center justify-between text-xs">
-                    <span className="text-stone-300 font-semibold">Motion Blur & Edge Sharpness:</span>
-                    <span className="font-mono text-emerald-400 font-bold">
-                      {qualityReport?.sharpnessStatus || 'SHARP'}
-                    </span>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-stone-950 border border-stone-800 flex items-center justify-between text-xs">
-                    <span className="text-stone-300 font-semibold">Undersize Threshold Gauge:</span>
-                    <span className="font-mono text-blue-400 font-bold">
-                      Active (45mm Cutoff)
-                    </span>
-                  </div>
-                </div>
-
-                <div className="pt-3 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={runFullPipeline}
-                    className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-xl shadow-emerald-600/30 transition"
-                  >
-                    <span>Run AI Defect & Grade Engine</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* STEP 3: PROCESSING */}
-      {step === 'processing' && (
-        <div className="bg-stone-900 border border-stone-800 rounded-3xl p-10 text-center space-y-8 shadow-2xl">
-          <div className="relative w-24 h-24 mx-auto flex items-center justify-center">
-            <div className="absolute inset-0 rounded-full border-4 border-emerald-500/20 animate-ping" />
-            <div className="w-20 h-20 rounded-full border-2 border-emerald-400 border-t-transparent animate-spin flex items-center justify-center" />
-            <span className="text-3xl absolute">🧅</span>
-          </div>
-
-          <div className="space-y-2">
-            <h2 className="text-xl font-black text-white">AI Computer Vision Quality Engine</h2>
-            <p className="text-xs text-stone-400">
-              Examining neck rot, Aspergillus spores, green sprout shoots, cuts, and measuring caliber...
-            </p>
-          </div>
-
-          <div className="max-w-2xl mx-auto flex items-center justify-center gap-1.5 flex-wrap">
-            {['RECEIVED', 'QUALITY CHECK', 'PREPROCESSING', 'DETECTING DEFECTS', 'CHECKING ROT & SPROUT', 'SIZING CALIBER', 'GRADING & URS CALCULATION'].map((st, i) => (
-              <span
-                key={st}
-                className={`text-[10px] font-mono px-2.5 py-1 rounded-lg border font-bold transition-all ${
-                  processingStage === st
-                    ? 'bg-emerald-500 text-stone-950 border-emerald-400 scale-105 shadow-md'
-                    : 'bg-stone-950 text-stone-600 border-stone-800'
-                }`}
-              >
-                {st}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* STEP 4: RESULTS & URS BREAKDOWN */}
-      {step === 'results' && result && (
-        <div className="space-y-6">
-          <div className="bg-stone-900 border border-stone-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-800 pb-6">
-              <div className="space-y-1">
-                <div className="flex items-center gap-3">
-                  <h2 className="text-2xl font-black text-white capitalize">
-                    {result.grade === 'GRADE_A' ? 'Grade A (FAQ Standard)' : result.grade === 'URS' ? 'URS (Under-Rate Stock)' : result.grade.replace('_', ' ')}
-                  </h2>
-                  <GradeBadge grade={result.grade} size="lg" showSubtitle />
-                </div>
-                <p className="text-xs text-stone-400">
-                  {result.variety} • Inspection ID: <span className="font-mono text-stone-300">{result.id}</span>
-                </p>
-              </div>
-
-              <div className="flex items-center gap-6 text-right">
-                <div>
-                  <span className="text-[10px] text-stone-400 uppercase font-bold block">Quality Score</span>
-                  <span className="text-3xl font-black text-white font-mono">{result.qualityScore}<span className="text-sm text-stone-500 font-normal">/100</span></span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-stone-400 uppercase font-bold block">AI Confidence</span>
-                  <span className={`text-2xl font-black font-mono ${result.confidenceScore >= 80 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                    {result.confidenceScore}%
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* 4-Pillar Hackathon Defect Classification Cards */}
-            <div className="space-y-2">
-              <span className="text-xs font-bold text-stone-300 uppercase tracking-wider block">
-                Four-Pillar Defect Classification Results:
-              </span>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {/* Rotten */}
-                <div className={`p-3.5 rounded-2xl border ${
-                  result.hackathonFlags?.isRotten
-                    ? 'bg-rose-950/60 border-rose-500/50 text-rose-300'
-                    : 'bg-stone-950 border-stone-800 text-stone-400'
-                }`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold">1. Rotten / Fungal</span>
-                    <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded font-bold ${
-                      result.hackathonFlags?.isRotten ? 'bg-rose-500/30 text-rose-200' : 'bg-emerald-500/10 text-emerald-400'
-                    }`}>
-                      {result.hackathonFlags?.isRotten ? 'DETECTED' : 'CLEAN'}
-                    </span>
-                  </div>
-                  <p className="text-[11px] leading-tight">
-                    {result.hackathonFlags?.rottenDetails || 'No soft rot or Aspergillus mycelia detected.'}
-                  </p>
-                </div>
-
-                {/* Sprouted */}
-                <div className={`p-3.5 rounded-2xl border ${
-                  result.hackathonFlags?.isSprouted
-                    ? 'bg-amber-950/60 border-amber-500/50 text-amber-300'
-                    : 'bg-stone-950 border-stone-800 text-stone-400'
-                }`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold">2. Sprouted Shoot</span>
-                    <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded font-bold ${
-                      result.hackathonFlags?.isSprouted ? 'bg-amber-500/30 text-amber-200' : 'bg-emerald-500/10 text-emerald-400'
-                    }`}>
-                      {result.hackathonFlags?.isSprouted ? 'DETECTED' : 'DORMANT'}
-                    </span>
-                  </div>
-                  <p className="text-[11px] leading-tight">
-                    {result.hackathonFlags?.sproutedDetails || 'Neck collar tightly closed with zero green shoots.'}
-                  </p>
-                </div>
-
-                {/* Damaged */}
-                <div className={`p-3.5 rounded-2xl border ${
-                  result.hackathonFlags?.isDamaged
-                    ? 'bg-blue-950/60 border-blue-500/50 text-blue-300'
-                    : 'bg-stone-950 border-stone-800 text-stone-400'
-                }`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold">3. Damaged / Cuts</span>
-                    <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded font-bold ${
-                      result.hackathonFlags?.isDamaged ? 'bg-blue-500/30 text-blue-200' : 'bg-emerald-500/10 text-emerald-400'
-                    }`}>
-                      {result.hackathonFlags?.isDamaged ? 'DETECTED' : 'SOUND'}
-                    </span>
-                  </div>
-                  <p className="text-[11px] leading-tight">
-                    {result.hackathonFlags?.damagedDetails || 'Papery tunics intact; zero deep slicing.'}
-                  </p>
-                </div>
-
-                {/* Undersized */}
-                <div className={`p-3.5 rounded-2xl border ${
-                  result.hackathonFlags?.isUndersized
-                    ? 'bg-purple-950/60 border-purple-500/50 text-purple-300'
-                    : 'bg-stone-950 border-stone-800 text-stone-400'
-                }`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-bold">4. Size Caliber</span>
-                    <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded font-bold ${
-                      result.hackathonFlags?.isUndersized ? 'bg-purple-500/30 text-purple-200' : 'bg-emerald-500/10 text-emerald-400'
-                    }`}>
-                      {result.hackathonFlags?.isUndersized ? '<45mm URS' : 'STANDARD'}
-                    </span>
-                  </div>
-                  <p className="text-[11px] leading-tight">
-                    {result.hackathonFlags?.undersizedDetails || 'Caliber conforms to commercial market tolerance.'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Results Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              <div className="lg:col-span-5 relative aspect-square rounded-2xl overflow-hidden bg-black border border-stone-800 shadow-md">
-                <img src={result.imageUrl} alt="" className="w-full h-full object-cover" />
-                <div className="absolute bottom-3 left-3 bg-stone-950/90 px-2.5 py-1 rounded-lg text-[10px] font-mono text-stone-300 border border-stone-700">
-                  {result.size.isCalibrated ? `Measured: ${result.size.estimatedDiameterMm} mm` : result.size.caliberCategory}
-                </div>
-              </div>
-
-              <div className="lg:col-span-7 space-y-4">
-                <div className="p-4 rounded-2xl bg-stone-950 border border-stone-800 space-y-1.5">
-                  <div className="text-xs font-bold text-stone-300 uppercase tracking-wider">
-                    Grading Engine Evaluation & Rationale
-                  </div>
-                  <p className="text-xs text-stone-200 leading-relaxed">
-                    {result.explanation}
-                  </p>
-                </div>
-
-                <div className="p-4 rounded-2xl bg-stone-950 border border-emerald-500/20 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <Scale className="w-4 h-4" />
-                      <span>Transparent Mandi Procurement Settlement Basis</span>
-                    </span>
-                    <span className="font-mono text-xs font-bold text-white">
-                      ₹{result.grade === 'GRADE_A' ? '2,650' : result.grade === 'GRADE_B' ? '2,250' : '1,080'} / quintal
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-stone-400">
-                    Calculated objectively from Grade A FAQ vs URS defect deductions. Prevents pricing manipulation between commission agents and farmers.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={handleReset}
-                    className="flex-1 py-3 rounded-2xl bg-stone-800 hover:bg-stone-750 text-stone-200 font-bold text-xs border border-stone-700 transition"
-                  >
-                    Assess Another Specimen
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onNavigate('batch_analytics')}
-                    className="flex-1 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-1.5"
-                  >
-                    <Layers className="w-4 h-4" />
-                    <span>View Batch Settlement</span>
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
         </div>

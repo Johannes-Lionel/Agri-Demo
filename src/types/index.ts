@@ -32,6 +32,14 @@ export interface HackathonDefectFlags {
   undersizedDetails?: string;
 }
 
+export interface VegetableCounts {
+  totalCount: number;
+  goodCount: number;
+  defectiveCount: number;
+  goodPercent: number; // 0 to 100
+  defectivePercent: number; // 0 to 100
+}
+
 export interface ImageQualityReport {
   width: number;
   height: number;
@@ -62,6 +70,7 @@ export interface InspectionRecord {
   batchId?: string;
   vegetableType: string;
   variety: string;
+  botanicalName?: string;
   imageUrl: string;
   calibrationUsed: boolean;
   calibrationReferenceType?: string;
@@ -77,6 +86,10 @@ export interface InspectionRecord {
   createdAt: string;
   defects: DefectItem[];
   hackathonFlags: HackathonDefectFlags;
+  counts: VegetableCounts;
+  isVegetable: boolean;
+  isFruit?: boolean;
+  rejectionReason?: string;
   shape: {
     shapeType: string;
     symmetryRatio: number;
@@ -163,6 +176,7 @@ export interface CertifiedReport {
   ursPercent: number;
   averageScore: number;
   averageConfidence: number;
+  counts?: VegetableCounts;
   gradeDistribution: {
     gradeA: number;
     gradeB: number;
@@ -204,11 +218,11 @@ export interface VerificationRecord {
 }
 
 export interface AppSettings {
-  confidenceThresholdForAutoAccept: number; // default 80
-  defaultVegetableType: string; // default 'onion'
+  confidenceThresholdForAutoAccept: number;
+  defaultVegetableType: string;
   calibrationReference: 'standard_coin_25mm' | 'standard_card_85mm' | 'grid_10mm' | 'none';
   selectedModel: 'gemini-2.5-flash' | 'pytorch-yolo-produce';
   facilityName: string;
   inspectorName: string;
-  baseMspRate: number; // ₹ per quintal benchmark for fair procurement
+  baseMspRate: number;
 }

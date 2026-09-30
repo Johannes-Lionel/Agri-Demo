@@ -8,57 +8,52 @@ interface GradeBadgeProps {
 }
 
 export const GradeBadge: React.FC<GradeBadgeProps> = ({ grade, size = 'md', showSubtitle = false }) => {
-  const configs: Record<GradeTier, { bg: string; label: string; sub: string; glow: string; dot: string }> = {
+  const configs: Record<GradeTier, { bg: string; label: string; sub: string; dot: string }> = {
     GRADE_A: {
-      bg: 'bg-emerald-950/80 text-emerald-400 border-emerald-500/40',
+      bg: 'bg-[#23492C] text-white border border-[#23492C]',
       label: 'Grade A',
-      sub: 'FAQ Export Quality',
-      glow: 'shadow-[0_0_15px_rgba(16,185,129,0.25)]',
-      dot: 'bg-emerald-400',
+      sub: 'FAQ Export Standard',
+      dot: 'bg-[#6CC330]',
     },
     GRADE_B: {
-      bg: 'bg-blue-950/80 text-blue-400 border-blue-500/40',
+      bg: 'bg-[#0B7347] text-white border border-[#0B7347]',
       label: 'Grade B',
-      sub: 'Domestic Commercial',
-      glow: 'shadow-[0_0_15px_rgba(59,130,246,0.25)]',
-      dot: 'bg-blue-400',
+      sub: 'Commercial Retail',
+      dot: 'bg-white',
     },
     GRADE_C: {
-      bg: 'bg-amber-950/80 text-amber-400 border-amber-500/40',
+      bg: 'bg-[#FAF6EE] text-[#0F1A13] border border-[#E9DFCF]',
       label: 'Grade C',
-      sub: 'Processing / Dicing',
-      glow: 'shadow-[0_0_15px_rgba(245,158,11,0.25)]',
-      dot: 'bg-amber-400',
+      sub: 'Processing',
+      dot: 'bg-amber-500',
     },
     URS: {
-      bg: 'bg-rose-950/90 text-rose-300 border-rose-500/50',
-      label: 'URS (Under-Rate Stock)',
-      sub: 'Undersized / Defective',
-      glow: 'shadow-[0_0_15px_rgba(244,63,94,0.3)]',
-      dot: 'bg-rose-400',
+      bg: 'bg-rose-100 text-rose-800 border border-rose-300',
+      label: 'URS (Under-Rate)',
+      sub: 'Defective / Cull',
+      dot: 'bg-rose-500',
     },
     REJECT: {
-      bg: 'bg-rose-950/80 text-rose-400 border-rose-500/40',
+      bg: 'bg-rose-100 text-rose-800 border border-rose-300',
       label: 'URS / Rejected',
       sub: 'Rotten / Sprouted Cull',
-      glow: 'shadow-[0_0_15px_rgba(244,63,94,0.25)]',
-      dot: 'bg-rose-400',
+      dot: 'bg-rose-500',
     },
   };
 
   const c = configs[grade] || configs.GRADE_B;
 
   const sizeClasses = {
-    sm: 'text-xs px-2.5 py-0.5 font-medium',
-    md: 'text-sm px-3 py-1 font-semibold',
-    lg: 'text-base px-4 py-1.5 font-bold',
+    sm: 'text-xs px-2.5 py-0.5 font-bold',
+    md: 'text-xs px-3.5 py-1 font-extrabold',
+    lg: 'text-sm px-4 py-1.5 font-black',
   };
 
   return (
-    <span className={`inline-flex items-center gap-1.5 border rounded-full ${c.bg} ${c.glow} ${sizeClasses[size]}`}>
-      <span className={`w-2 h-2 rounded-full ${c.dot} animate-pulse`} />
+    <span className={`inline-flex items-center gap-1.5 rounded-full shadow-xs ${c.bg} ${sizeClasses[size]}`}>
+      <span className={`w-2 h-2 rounded-full ${c.dot}`} />
       <span>{c.label}</span>
-      {showSubtitle && <span className="opacity-70 text-[0.8em]">({c.sub})</span>}
+      {showSubtitle && <span className="opacity-80 text-[0.8em] font-normal">({c.sub})</span>}
     </span>
   );
 };

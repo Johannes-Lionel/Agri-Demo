@@ -8,312 +8,54 @@ import {
   CertifiedReport, VerificationRecord 
 } from '../types';
 
+// Clean initial state with zero hardcoded sample images or fake data
 export const INITIAL_BATCHES: BatchRecord[] = [
   {
-    id: 'batch-on-881',
-    batchNumber: 'LOT-ON-2026-881',
+    id: 'batch-live-01',
+    batchNumber: 'LOT-MANDI-2026-01',
     userId: 'usr-default',
     vegetableType: 'onion',
-    variety: 'Yellow Spanish Sweet Onion',
-    growerOrigin: 'Treasure Valley Alliums (Plot 4)',
-    quantityInspected: 125,
-    estimatedLotWeightKg: 4500,
-    gradeAPercent: 65.6,
-    ursPercent: 12.0,
+    variety: 'Nashik Red Allium',
+    growerOrigin: 'Active Procurement Bay #1',
+    quantityInspected: 0,
+    estimatedLotWeightKg: 4000,
+    gradeAPercent: 0,
+    ursPercent: 0,
     gradeDistribution: {
-      gradeA: 82,
-      gradeB: 28,
+      gradeA: 0,
+      gradeB: 0,
       gradeC: 0,
-      urs: 15,
+      urs: 0,
       reject: 0,
     },
     defectBreakdownSummary: {
-      rottenCount: 3,
-      sproutedCount: 4,
-      damagedCount: 6,
-      undersizedCount: 2,
+      rottenCount: 0,
+      sproutedCount: 0,
+      damagedCount: 0,
+      undersizedCount: 0,
     },
     settlement: {
       baseMspPerQuintal: 2400,
       gradeAPremium: 250,
-      ursPenalty: 380,
-      finalRatePerQuintal: 2360,
-      estimatedLotWeightKg: 4500,
-      totalFarmerPayout: 106200,
-      transparencyAuditHash: 'SHA256-AGRI-881-FAQ-OK',
+      ursPenalty: 0,
+      finalRatePerQuintal: 2400,
+      estimatedLotWeightKg: 4000,
+      totalFarmerPayout: 96000,
+      transparencyAuditHash: 'SHA256-LIVE-LOT-READY',
     },
-    averageConfidence: 89.4,
-    averageScore: 86.2,
-    defectSummary: {
-      'Superficial Skin Slip': 18,
-      'Minor Basal Scar': 8,
-      'Sunscald Greening': 4,
-      'Aspergillus Black Mold': 3,
-    },
-    humanReviewCount: 1,
+    averageConfidence: 0,
+    averageScore: 0,
+    defectSummary: {},
+    humanReviewCount: 0,
     status: 'open',
-    createdAt: '2026-09-28T09:30:00.000Z',
-    updatedAt: '2026-09-29T16:45:00.000Z',
-  },
-  {
-    id: 'batch-on-879',
-    batchNumber: 'LOT-ON-2026-879',
-    userId: 'usr-default',
-    vegetableType: 'onion',
-    variety: 'Red Creole Bulb',
-    growerOrigin: 'Red River Allium Cooperative',
-    quantityInspected: 240,
-    estimatedLotWeightKg: 8200,
-    gradeAPercent: 72.9,
-    ursPercent: 8.3,
-    gradeDistribution: {
-      gradeA: 175,
-      gradeB: 45,
-      gradeC: 0,
-      urs: 20,
-      reject: 0,
-    },
-    defectBreakdownSummary: {
-      rottenCount: 5,
-      sproutedCount: 3,
-      damagedCount: 8,
-      undersizedCount: 4,
-    },
-    settlement: {
-      baseMspPerQuintal: 2400,
-      gradeAPremium: 250,
-      ursPenalty: 210,
-      finalRatePerQuintal: 2440,
-      estimatedLotWeightKg: 8200,
-      totalFarmerPayout: 200080,
-      transparencyAuditHash: 'SHA256-AGRI-879-FAQ-OK',
-    },
-    averageConfidence: 92.1,
-    averageScore: 89.8,
-    defectSummary: {
-      'Superficial Skin Slip': 24,
-      'Dry Splitting': 12,
-      'Mechanical Bruise': 5,
-    },
-    humanReviewCount: 1,
-    status: 'certified',
-    createdAt: '2026-09-26T11:00:00.000Z',
-    updatedAt: '2026-09-27T14:15:00.000Z',
-  },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }
 ];
 
-export const INITIAL_INSPECTIONS: InspectionRecord[] = [
-  {
-    id: 'insp-on-101',
-    userId: 'usr-default',
-    batchId: 'batch-on-881',
-    vegetableType: 'onion',
-    variety: 'Yellow Spanish Sweet',
-    imageUrl: 'https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?auto=format&fit=crop&w=800&q=80',
-    calibrationUsed: true,
-    calibrationReferenceType: 'standard_coin_25mm',
-    imageQuality: {
-      width: 1200,
-      height: 1200,
-      megapixels: 1.44,
-      resolutionStatus: 'PASSED',
-      exposureStatus: 'PASSED',
-      averageBrightness: 125,
-      sharpnessStatus: 'SHARP',
-      sharpnessScore: 84,
-      framingStatus: 'CENTERED',
-      overallQualityPassed: true,
-      warnings: [],
-    },
-    confidenceScore: 94,
-    needsHumanReview: false,
-    grade: 'GRADE_A',
-    gradeName: 'Grade A (FAQ / Export Quality)',
-    qualityScore: 94,
-    explanation: 'Uniform golden skin tunic, intact dry neck closure, clean basal plate. Calibrated diameter 74mm within Jumbo specification.',
-    status: 'completed',
-    createdAt: '2026-09-29T10:15:00.000Z',
-    hackathonFlags: {
-      isRotten: false,
-      isSprouted: false,
-      isDamaged: false,
-      isUndersized: false,
-    },
-    defects: [
-      {
-        id: 'def-1',
-        type: 'skin_peeling',
-        label: 'Minor Papery Flake (<3%)',
-        severity: 'minor',
-        locationDesc: 'Apical shoulder',
-        confidence: 91,
-        estimatedAreaPercent: 1.2,
-      },
-    ],
-    shape: {
-      shapeType: 'Globular',
-      symmetryRatio: 92,
-      regularityDescription: 'Highly symmetrical globe bulb',
-    },
-    color: {
-      dominantColor: 'Amber Golden Bronze',
-      skinColorUniformity: 93,
-      browningOrDiscoloration: 2,
-      description: 'Evenly cured papery outer scales',
-    },
-    size: {
-      estimatedDiameterMm: 74.2,
-      caliberCategory: 'Jumbo (75mm class)',
-      isCalibrated: true,
-      calibrationReference: 'standard_coin_25mm',
-      accuracyNote: 'Calibrated using physical coin marker',
-    },
-    unreliableAttributes: [],
-    rawObservations: 'Zero vegetative sprout shoots detected. Turgid internal scales, dry papery wrapper. Passed Grade A FAQ.',
-    aiModelUsed: 'Gemini 2.5 Flash Vision Inspector',
-  },
-  {
-    id: 'insp-on-102',
-    userId: 'usr-default',
-    batchId: 'batch-on-881',
-    vegetableType: 'onion',
-    variety: 'Yellow Spanish Sweet',
-    imageUrl: 'https://images.unsplash.com/photo-1508747703725-719777637510?auto=format&fit=crop&w=800&q=80',
-    calibrationUsed: false,
-    imageQuality: {
-      width: 800,
-      height: 800,
-      megapixels: 0.64,
-      resolutionStatus: 'PASSED',
-      exposureStatus: 'PASSED',
-      averageBrightness: 110,
-      sharpnessStatus: 'MODERATE',
-      sharpnessScore: 62,
-      framingStatus: 'CENTERED',
-      overallQualityPassed: true,
-      warnings: ['Moderate sharpness due to oblique angle'],
-    },
-    confidenceScore: 72,
-    needsHumanReview: true,
-    humanReviewReason: 'Low AI confidence (72% < 80% threshold). Ambiguous dark pigmentation near neck collar.',
-    grade: 'GRADE_B',
-    gradeName: 'Grade B (Commercial Domestic Retail)',
-    qualityScore: 74,
-    explanation: 'Localized discoloration near the dried neck. Requires manual tactile check to ensure dryness.',
-    status: 'needs_review',
-    createdAt: '2026-09-29T11:40:00.000Z',
-    hackathonFlags: {
-      isRotten: false,
-      isSprouted: false,
-      isDamaged: true,
-      isUndersized: false,
-      damagedDetails: 'Superficial neck discoloration (not active rot)',
-    },
-    defects: [
-      {
-        id: 'def-2',
-        type: 'damage',
-        label: 'Localized Dark Pigment at Neck Collar',
-        severity: 'moderate',
-        locationDesc: 'Neck boundary',
-        confidence: 68,
-        estimatedAreaPercent: 5.8,
-      },
-    ],
-    shape: {
-      shapeType: 'Slightly Flattened Globe',
-      symmetryRatio: 81,
-      regularityDescription: 'Normal cultivar shape with slight lateral asymmetry',
-    },
-    color: {
-      dominantColor: 'Light Copper',
-      skinColorUniformity: 76,
-      browningOrDiscoloration: 12,
-      description: 'Color slightly uneven across upper shoulder',
-    },
-    size: {
-      estimatedDiameterMm: null,
-      caliberCategory: 'Estimated Medium (~65mm)',
-      isCalibrated: false,
-      accuracyNote: 'Estimated visually without calibration reference',
-    },
-    unreliableAttributes: ['Neck internal firmness (requires tactile verification)'],
-    rawObservations: 'Discoloration could be harmless soil marking or early saprophytic spore. Flagged for human review.',
-    aiModelUsed: 'Gemini 2.5 Flash Vision Inspector',
-  },
-];
-
-export const INITIAL_REPORTS: CertifiedReport[] = [
-  {
-    id: 'rep-on-2026-01',
-    reportNumber: 'CERT-AGRI-2026-0042',
-    userId: 'usr-default',
-    batchId: 'batch-on-879',
-    verificationId: 'VER-AGRI-879-X4',
-    vegetableType: 'onion',
-    variety: 'Red Creole Bulb',
-    growerOrigin: 'Red River Allium Cooperative',
-    totalQuantity: 240,
-    estimatedLotWeightKg: 8200,
-    certifiedGrade: 'GRADE_A',
-    gradeAPercent: 72.9,
-    ursPercent: 8.3,
-    averageScore: 89.8,
-    averageConfidence: 92.1,
-    gradeDistribution: {
-      gradeA: 175,
-      gradeB: 45,
-      gradeC: 0,
-      urs: 20,
-      reject: 0,
-    },
-    defectBreakdownSummary: {
-      rottenCount: 5,
-      sproutedCount: 3,
-      damagedCount: 8,
-      undersizedCount: 4,
-    },
-    settlement: {
-      baseMspPerQuintal: 2400,
-      gradeAPremium: 250,
-      ursPenalty: 210,
-      finalRatePerQuintal: 2440,
-      estimatedLotWeightKg: 8200,
-      totalFarmerPayout: 200080,
-      transparencyAuditHash: 'SHA256-AGRI-879-FAQ-OK',
-    },
-    defectSummary: {
-      'Superficial Skin Slip': 24,
-      'Dry Splitting': 12,
-      'Mechanical Bruise': 5,
-    },
-    humanReviewCount: 1,
-    certifiedBy: 'Dr. Sarah Lin (Lead Q/A Inspector)',
-    facilityName: 'AgriGrade Regional Packhouse #4',
-    publicVerificationUrl: '/verify/rep-on-2026-01',
-    createdAt: '2026-09-27T15:00:00.000Z',
-  },
-];
-
-export const INITIAL_VERIFICATIONS: VerificationRecord[] = [
-  {
-    id: 'rep-on-2026-01',
-    reportId: 'rep-on-2026-01',
-    reportNumber: 'CERT-AGRI-2026-0042',
-    batchNumber: 'LOT-ON-2026-879',
-    vegetableType: 'Onion (Dry Bulb)',
-    variety: 'Red Creole Bulb',
-    certifiedGrade: 'GRADE_A',
-    gradeAPercent: 72.9,
-    ursPercent: 8.3,
-    totalInspected: 240,
-    overallQualityScore: 89.8,
-    certificationDate: '2026-09-27',
-    issuer: 'AgriGrade Mandi Certification Authority',
-    facilityName: 'AgriGrade Regional Packhouse #4',
-    isValid: true,
-  },
-];
+export const INITIAL_INSPECTIONS: InspectionRecord[] = [];
+export const INITIAL_REPORTS: CertifiedReport[] = [];
+export const INITIAL_VERIFICATIONS: VerificationRecord[] = [];
 
 let memoryBatches = [...INITIAL_BATCHES];
 let memoryInspections = [...INITIAL_INSPECTIONS];
@@ -394,7 +136,7 @@ export const firestoreService = {
       console.warn('Failed to write inspection to Firestore:', err);
     }
 
-    // Update parent batch statistics if batchId is provided
+    // Update parent batch statistics dynamically
     if (inspection.batchId) {
       const batch = memoryBatches.find((b) => b.id === inspection.batchId);
       if (batch) {
@@ -403,18 +145,30 @@ export const firestoreService = {
         const gA = bInsps.filter((i) => i.grade === 'GRADE_A').length;
         const gB = bInsps.filter((i) => i.grade === 'GRADE_B').length;
         const gURS = bInsps.filter((i) => i.grade === 'URS' || i.grade === 'REJECT').length;
-        const gradeAPct = Number(((gA / count) * 100).toFixed(1));
-        const ursPct = Number(((gURS / count) * 100).toFixed(1));
+        const gradeAPct = count > 0 ? Number(((gA / count) * 100).toFixed(1)) : 0;
+        const ursPct = count > 0 ? Number(((gURS / count) * 100).toFixed(1)) : 0;
 
         const rot = bInsps.filter((i) => i.hackathonFlags?.isRotten).length;
         const spr = bInsps.filter((i) => i.hackathonFlags?.isSprouted).length;
         const dam = bInsps.filter((i) => i.hackathonFlags?.isDamaged).length;
         const und = bInsps.filter((i) => i.hackathonFlags?.isUndersized).length;
 
+        const avgScore = count > 0 ? Math.round(bInsps.reduce((acc, curr) => acc + curr.qualityScore, 0) / count) : 0;
+        const avgConf = count > 0 ? Math.round(bInsps.reduce((acc, curr) => acc + curr.confidenceScore, 0) / count) : 0;
+
+        const baseMsp = 2400;
+        const gradeABonus = Math.round((gradeAPct / 100) * 250);
+        const ursDeduction = Math.round((ursPct / 100) * 450);
+        const finalRate = Math.max(1200, baseMsp + gradeABonus - ursDeduction);
+        const weightKg = batch.estimatedLotWeightKg || 4000;
+        const totalPayout = Math.round((weightKg / 100) * finalRate);
+
         await this.updateBatch(batch.id, {
           quantityInspected: count,
           gradeAPercent: gradeAPct,
           ursPercent: ursPct,
+          averageScore: avgScore,
+          averageConfidence: avgConf,
           gradeDistribution: {
             gradeA: gA,
             gradeB: gB,
@@ -427,6 +181,15 @@ export const firestoreService = {
             sproutedCount: spr,
             damagedCount: dam,
             undersizedCount: und,
+          },
+          settlement: {
+            baseMspPerQuintal: baseMsp,
+            gradeAPremium: gradeABonus,
+            ursPenalty: ursDeduction,
+            finalRatePerQuintal: finalRate,
+            estimatedLotWeightKg: weightKg,
+            totalFarmerPayout: totalPayout,
+            transparencyAuditHash: `SHA256-AGRI-${Date.now()}`,
           },
         });
       }
@@ -497,12 +260,12 @@ export const firestoreService = {
       id: report.id,
       reportId: report.id,
       reportNumber: report.reportNumber,
-      batchNumber: `BATCH-${report.batchId.slice(-6).toUpperCase()}`,
+      batchNumber: `LOT-${report.batchId.slice(-6).toUpperCase()}`,
       vegetableType: report.vegetableType,
       variety: report.variety,
       certifiedGrade: report.certifiedGrade,
-      gradeAPercent: report.gradeAPercent || 80,
-      ursPercent: report.ursPercent || 10,
+      gradeAPercent: report.gradeAPercent || 0,
+      ursPercent: report.ursPercent || 0,
       totalInspected: report.totalQuantity,
       overallQualityScore: report.averageScore,
       certificationDate: report.createdAt.split('T')[0],

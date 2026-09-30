@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Navbar, ActivePage } from './components/Navigation/Navbar';
-import { LandingPage } from './pages/LandingPage';
+import { SplashScreen } from './pages/SplashScreen';
+import { HomePage } from './pages/HomePage';
 import { AuthPage } from './pages/AuthPage';
-import { DashboardPage } from './pages/DashboardPage';
 import { NewInspectionPage } from './pages/NewInspectionPage';
 import { HumanReviewPage } from './pages/HumanReviewPage';
 import { BatchAnalyticsPage } from './pages/BatchAnalyticsPage';
@@ -16,23 +16,28 @@ const MainApp: React.FC = () => {
   const { user } = useAuth();
   const [currentPage, setCurrentPage] = useState<ActivePage>('dashboard');
   const [pendingReviewCount, setPendingReviewCount] = useState<number>(0);
-  const [verifyReportId, setVerifyReportId] = useState<string>('rep-on-2026-01');
+  const [verifyReportId, setVerifyReportId] = useState<string>('AO-2029-4142');
+  const [uploadedDataUrl, setUploadedDataUrl] = useState<string | null>(null);
 
-  // Detect URL path like /verify/:reportId
+  // Check if first-time visitor to show Splash screen
   useEffect(() => {
+    const hasSeenSplash = sessionStorage.getItem('agrigrade_splash_shown');
     const pathname = window.location.pathname;
+
     if (pathname.startsWith('/verify/')) {
       const id = pathname.replace('/verify/', '');
       if (id) {
         setVerifyReportId(id);
         setCurrentPage('verify');
       }
-    } else if (!user) {
-      setCurrentPage('landing');
+    } else if (!hasSeenSplash) {
+      setCurrentPage('splash');
+    } else {
+      setCurrentPage('dashboard');
     }
-  }, [user]);
+  }, []);
 
-  // Load pending reviews count
+  // Polling pending reviews count
   useEffect(() => {
     const checkPending = async () => {
       try {
@@ -47,6 +52,16 @@ const MainApp: React.FC = () => {
     return () => clearInterval(interval);
   }, [currentPage]);
 
+  const handleStartFromSplash = () => {
+    sessionStorage.setItem('agrigrade_splash_shown', 'true');
+    setCurrentPage('dashboard');
+  };
+
+  const handleFileFromHome = (dataUrl: string) => {
+    setUploadedDataUrl(dataUrl);
+    setCurrentPage('new_inspection');
+  };
+
   const handleOpenPublicVerification = (reportId: string) => {
     setVerifyReportId(reportId);
     setCurrentPage('verify');
@@ -54,14 +69,14 @@ const MainApp: React.FC = () => {
   };
 
   const handleBackToApp = () => {
-    setCurrentPage(user ? 'dashboard' : 'landing');
+    setCurrentPage('dashboard');
     window.history.pushState({}, '', '/');
   };
 
   return (
-    <div className="min-h-screen bg-stone-950 text-stone-100 flex flex-col font-sans">
-      {/* Hide main navbar on public QR verification page to present a clean verification experience */}
-      {currentPage !== 'verify' && (
+    <div className="min-h-screen bg-[#F4EBDC] text-[#0F1A13] flex flex-col font-sans select-none">
+      {/* Hide header and navbar on Splash and Verification screens */}
+      {currentPage !== 'splash' && currentPage !== 'verify' && (
         <Navbar
           currentPage={currentPage}
           onNavigate={(p) => {
@@ -72,11 +87,21 @@ const MainApp: React.FC = () => {
         />
       )}
 
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {currentPage === 'landing' && <LandingPage onNavigate={setCurrentPage} />}
+      <main className="flex-1 w-full max-w-md mx-auto px-4 py-4">
+        {currentPage === 'splash' && <SplashScreen onStart={handleStartFromSplash} />}
+        {currentPage === 'dashboard' && (
+          <HomePage
+            onNavigate={setCurrentPage}
+            onFileSelected={handleFileFromHome}
+          />
+        )}
         {currentPage === 'auth' && <AuthPage onNavigate={setCurrentPage} />}
-        {currentPage === 'dashboard' && <DashboardPage onNavigate={setCurrentPage} />}
-        {currentPage === 'new_inspection' && <NewInspectionPage onNavigate={setCurrentPage} />}
+        {currentPage === 'new_inspection' && (
+          <NewInspectionPage
+            onNavigate={setCurrentPage}
+            initialImageDataUrl={uploadedDataUrl}
+          />
+        )}
         {currentPage === 'human_review' && <HumanReviewPage onNavigate={setCurrentPage} />}
         {currentPage === 'batch_analytics' && <BatchAnalyticsPage onNavigate={setCurrentPage} />}
         {currentPage === 'reports' && (
@@ -90,21 +115,6 @@ const MainApp: React.FC = () => {
         )}
         {currentPage === 'settings' && <SettingsPage />}
       </main>
-
-      <footer className="border-t border-stone-900 bg-stone-950 py-6 text-stone-500 text-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <span>🧅 AgriGrade AI Vegetable Quality Inspection Platform</span>
-            <span>•</span>
-            <span>Allium cepa Core Engine</span>
-          </div>
-          <div className="flex items-center gap-4 text-stone-400">
-            <span>Replaceable AI Service Interface</span>
-            <span>•</span>
-            <span>Firestore Ledger</span>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 };

@@ -1,11 +1,14 @@
 import React from 'react';
 import { 
-  Scan, LayoutDashboard, UserCheck, Layers, 
-  FileText, Settings, ShieldCheck, LogIn, LogOut, Sparkles 
+  Home, History, BarChart3, User, Scan, 
+  FileText, Smartphone, LogOut, LogIn 
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { PWAInstallButton } from '../common/PWAInstallButton';
+import { AgrigradeLogo } from '../common/AgrigradeLogo';
 
 export type ActivePage = 
+  | 'splash'
   | 'landing' 
   | 'dashboard' 
   | 'new_inspection' 
@@ -25,105 +28,112 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({ currentPage, onNavigate, pendingReviewCount }) => {
   const { user, signOut } = useAuth();
 
-  const navItems = [
-    { id: 'dashboard' as ActivePage, label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'new_inspection' as ActivePage, label: 'New Inspection', icon: Scan, highlight: true },
-    { 
-      id: 'human_review' as ActivePage, 
-      label: 'Human Review', 
-      icon: UserCheck, 
-      badge: pendingReviewCount > 0 ? pendingReviewCount : undefined 
-    },
-    { id: 'batch_analytics' as ActivePage, label: 'Batches', icon: Layers },
-    { id: 'reports' as ActivePage, label: 'Reports', icon: FileText },
-    { id: 'settings' as ActivePage, label: 'Settings', icon: Settings },
-  ];
-
   return (
-    <header className="sticky top-0 z-40 bg-stone-950/90 backdrop-blur-md border-b border-stone-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Brand Logo */}
-          <div 
-            onClick={() => onNavigate(user ? 'dashboard' : 'landing')} 
-            className="flex items-center gap-3 cursor-pointer"
-          >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white font-black text-xl">
-              🧅
+    <>
+      {/* Top Header (Beige #F6EDE8) */}
+      <header className="sticky top-0 z-40 bg-[#F6EDE8] border-b border-[#E9DFCF] shadow-xs">
+        <div className="max-w-md mx-auto px-4">
+          <div className="flex items-center justify-between h-14">
+            {/* Logo */}
+            <div 
+              onClick={() => onNavigate('dashboard')} 
+              className="cursor-pointer"
+            >
+              <AgrigradeLogo size="sm" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xl font-extrabold tracking-tight text-white">
-                  Agri<span className="text-emerald-400">Grade</span>
-                </span>
-                <span className="text-[10px] px-2 py-0.5 rounded font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider">
-                  AI Vision
-                </span>
-              </div>
-              <p className="text-[11px] text-stone-400 hidden sm:block">Automated Vegetable Quality Grading Platform</p>
-            </div>
-          </div>
 
-          {/* Navigation Links */}
-          <nav className="hidden md:flex items-center gap-1">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = currentPage === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => onNavigate(item.id)}
-                  className={`relative flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                    isActive
-                      ? 'bg-stone-850 text-emerald-400 border border-stone-700/80 shadow-sm'
-                      : item.highlight
-                      ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-900/60'
-                      : 'text-stone-400 hover:text-stone-200 hover:bg-stone-900'
-                  }`}
-                >
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-emerald-400' : 'text-stone-400'}`} />
-                  <span>{item.label}</span>
-                  {item.badge !== undefined && (
-                    <span className="ml-1 px-1.5 py-0.2 text-[10px] rounded-full bg-amber-500/20 text-amber-300 font-mono font-bold animate-pulse border border-amber-500/40">
-                      {item.badge}
-                    </span>
-                  )}
-                  {isActive && (
-                    <div className="absolute -bottom-[1px] left-3 right-3 h-[2px] bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full" />
-                  )}
-                </button>
-              );
-            })}
-          </nav>
+            {/* Actions: Install App & User Login */}
+            <div className="flex items-center gap-2">
+              <PWAInstallButton variant="navbar" />
 
-          {/* User Profile / Auth State */}
-          <div className="flex items-center gap-3">
-            {user ? (
-              <div className="flex items-center gap-3">
-                <div className="text-right hidden sm:block">
-                  <div className="text-xs font-bold text-stone-200">{user.displayName}</div>
-                  <div className="text-[10px] text-emerald-400 font-mono capitalize">{user.role} • {user.facilityName.split(' ')[0]}</div>
-                </div>
+              {user ? (
                 <button
                   onClick={() => signOut()}
                   title="Sign Out"
-                  className="p-2 rounded-xl text-stone-400 hover:text-stone-200 hover:bg-stone-900 border border-stone-800 transition"
+                  className="p-1.5 rounded-full text-[#23492C] hover:bg-[#EAF2E9] transition"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => onNavigate('auth')}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md transition"
-              >
-                <LogIn className="w-3.5 h-3.5" />
-                <span>Inspector Login</span>
-              </button>
-            )}
+              ) : (
+                <button
+                  onClick={() => onNavigate('auth')}
+                  className="px-3 py-1 rounded-full bg-[#0B7347] hover:bg-[#3F5A3A] text-white font-bold text-xs shadow-xs transition"
+                >
+                  Login
+                </button>
+              )}
+            </div>
           </div>
         </div>
-      </div>
-    </header>
+      </header>
+
+      {/* Bottom Navigation Bar Matching 02 Home & 06 Analytics Screens */}
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 border-t border-[#E9DFCF] backdrop-blur-md px-6 py-2 shadow-lg safe-area-pb">
+        <div className="max-w-md mx-auto flex items-center justify-around">
+          {/* Home */}
+          <button
+            onClick={() => onNavigate('dashboard')}
+            className={`flex flex-col items-center gap-1 transition ${
+              currentPage === 'dashboard' ? 'text-[#0B7347]' : 'text-[#0F1A13]/50 hover:text-[#23492C]'
+            }`}
+          >
+            <Home className="w-5 h-5 stroke-[2.2]" />
+            <span className={`text-[10px] ${currentPage === 'dashboard' ? 'font-bold' : 'font-medium'}`}>
+              Home
+            </span>
+          </button>
+
+          {/* History / Batches */}
+          <button
+            onClick={() => onNavigate('batch_analytics')}
+            className={`flex flex-col items-center gap-1 transition ${
+              currentPage === 'batch_analytics' ? 'text-[#0B7347]' : 'text-[#0F1A13]/50 hover:text-[#23492C]'
+            }`}
+          >
+            <BarChart3 className="w-5 h-5 stroke-[2.2]" />
+            <span className={`text-[10px] ${currentPage === 'batch_analytics' ? 'font-bold' : 'font-medium'}`}>
+              Analytics
+            </span>
+          </button>
+
+          {/* Center Scan / Smart Capture Button */}
+          <button
+            onClick={() => onNavigate('new_inspection')}
+            className="relative -top-3 flex flex-col items-center"
+          >
+            <div className="w-12 h-12 rounded-full bg-[#23492C] border-2 border-white shadow-xl flex items-center justify-center text-white active:scale-95 transition-transform">
+              <Scan className="w-5 h-5 stroke-[2.5]" />
+            </div>
+            <span className="text-[9px] font-bold text-[#23492C] mt-0.5">Scan</span>
+          </button>
+
+          {/* Reports */}
+          <button
+            onClick={() => onNavigate('reports')}
+            className={`flex flex-col items-center gap-1 transition ${
+              currentPage === 'reports' ? 'text-[#0B7347]' : 'text-[#0F1A13]/50 hover:text-[#23492C]'
+            }`}
+          >
+            <FileText className="w-5 h-5 stroke-[2.2]" />
+            <span className={`text-[10px] ${currentPage === 'reports' ? 'font-bold' : 'font-medium'}`}>
+              Reports
+            </span>
+          </button>
+
+          {/* Profile / Settings */}
+          <button
+            onClick={() => onNavigate('settings')}
+            className={`flex flex-col items-center gap-1 transition ${
+              currentPage === 'settings' ? 'text-[#0B7347]' : 'text-[#0F1A13]/50 hover:text-[#23492C]'
+            }`}
+          >
+            <User className="w-5 h-5 stroke-[2.2]" />
+            <span className={`text-[10px] ${currentPage === 'settings' ? 'font-bold' : 'font-medium'}`}>
+              Profile
+            </span>
+          </button>
+        </div>
+      </nav>
+    </>
   );
 };
