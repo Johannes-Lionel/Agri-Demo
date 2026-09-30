@@ -1,18 +1,14 @@
-import { AIAnalysisOutput } from './aiTypes';
+import type { AIAnalysisOutput } from './aiTypes.ts';
 
 export interface GradingConfig {
-  confidenceThresholdForAutoAccept: number; // e.g. 80%
+  confidenceThresholdForAutoAccept: number;
+  baseMspRatePerQuintal: number; // e.g. ₹2,400 benchmark price
   gradeA: {
     minScore: number;
     maxDefectPercent: number;
     minSymmetry: number;
   };
   gradeB: {
-    minScore: number;
-    maxDefectPercent: number;
-    minSymmetry: number;
-  };
-  gradeC: {
     minScore: number;
     maxDefectPercent: number;
     minSymmetry: number;
@@ -21,8 +17,9 @@ export interface GradingConfig {
 
 export const DEFAULT_GRADING_CONFIG: GradingConfig = {
   confidenceThresholdForAutoAccept: 80,
+  baseMspRatePerQuintal: 2400,
   gradeA: {
-    minScore: 88,
+    minScore: 85,
     maxDefectPercent: 3.5,
     minSymmetry: 80,
   },
@@ -31,27 +28,19 @@ export const DEFAULT_GRADING_CONFIG: GradingConfig = {
     maxDefectPercent: 9.0,
     minSymmetry: 65,
   },
-  gradeC: {
-    minScore: 50,
-    maxDefectPercent: 20.0,
-    minSymmetry: 50,
-  },
 };
 
 export interface GradingEngineResult {
-  qualityScore: number; // 0 - 100
-  grade: 'GRADE_A' | 'GRADE_B' | 'GRADE_C' | 'REJECT';
+  qualityScore: number;
+  grade: 'GRADE_A' | 'GRADE_B' | 'GRADE_C' | 'URS' | 'REJECT';
   gradeName: string;
+  isGradeA: boolean;
+  isURS: boolean;
+  ursReason?: string;
   explanation: string;
   needsHumanReview: boolean;
   reviewReason?: string;
-  defectPenaltyTotal: number;
-  scoreBreakdown: {
-    shapeScore: number;
-    colorScore: number;
-    defectDeductions: number;
-    confidenceFactor: number;
-  };
+  fairPriceRatePerQuintal: number;
 }
 
 export class VegetableGradingEngine {
@@ -71,129 +60,135 @@ export class VegetableGradingEngine {
     if (!aiAnalysis.detectionPresent) {
       return {
         qualityScore: 0,
-        grade: 'REJECT',
-        gradeName: 'Reject / Undetected',
-        explanation: 'No vegetable specimen detected in the provided image field.',
+        grade: 'URS',
+        gradeName: 'URS (Unfit / No Onion Detected)',
+        isGradeA: false,
+        isURS: true,
+        ursReason: 'No valid produce specimen detected in the camera frame.',
+        explanation: 'Specimen failed detection. Cannot be certified for procurement intake.',
         needsHumanReview: true,
-        reviewReason: 'No produce detected in image frame.',
-        defectPenaltyTotal: 100,
-        scoreBreakdown: {
-          shapeScore: 0,
-          colorScore: 0,
-          defectDeductions: 100,
-          confidenceFactor: 0,
-        },
+        reviewReason: 'Detection absent in frame.',
+        fairPriceRatePerQuintal: 0,
       };
     }
 
-    // Calculate defect deduction based on detected defects & severity
+    const flags = aiAnalysis.hackathonFlags || {
+      isRotten: false,
+      isSprouted: false,
+      isDamaged: false,
+      isUndersized: false,
+    };
+
+    // Calculate URS Qualification
+    // If the onion is Rotten, Sprouted, severely Damaged, or Undersized, it is categorized as URS!
+    let isURS = false;
+    let ursReason = '';
+    const ursConditions: string[] = [];
+
+    if (flags.isRotten) {
+      isURS = true;
+      ursConditions.push('Rotten / Fungal decay (Aspergillus/Botrytis)');
+    }
+    if (flags.isSprouted) {
+      isURS = true;
+      ursConditions.push('Sprouted vegetative shoot');
+    }
+    if (flags.isUndersized) {
+      isURS = true;
+      ursConditions.push('Undersized caliber (<45mm diameter)');
+    }
+    if (flags.isDamaged && (aiAnalysis.defectsDetected.some((d) => d.severity === 'critical') || flags.damagedDetails?.includes('severe'))) {
+      isURS = true;
+      ursConditions.push('Severe mechanical damage / puncture');
+    }
+
+    if (isURS) {
+      ursReason = ursConditions.join(' + ');
+    }
+
+    // Baseline scoring
     let defectPenaltyTotal = 0;
-    let hasCriticalDefect = false;
-    let criticalDefectName = '';
-
     for (const defect of aiAnalysis.defectsDetected) {
-      let weight = 1.0;
-      if (defect.severity === 'critical') {
-        weight = 3.5;
-        hasCriticalDefect = true;
-        criticalDefectName = defect.label;
-      } else if (defect.severity === 'moderate') {
-        weight = 2.0;
-      } else {
-        weight = 1.0;
-      }
-
+      const weight = defect.severity === 'critical' ? 3.5 : defect.severity === 'moderate' ? 2.0 : 1.0;
       defectPenaltyTotal += defect.estimatedAreaPercent * weight * (defect.confidence / 100);
     }
 
-    // Special crop logic for Onions:
-    // Check for black mold (Aspergillus), neck rot (Botrytis), or green sprouting
-    const totalDefectArea = aiAnalysis.defectsDetected.reduce(
-      (sum, d) => sum + d.estimatedAreaPercent,
-      0
-    );
+    const totalDefectArea = aiAnalysis.defectsDetected.reduce((sum, d) => sum + d.estimatedAreaPercent, 0);
+    const shapeScore = Math.max(40, aiAnalysis.shapeCharacteristics?.symmetryRatio || 80);
+    const colorScore = Math.max(40, aiAnalysis.colorMetrics?.skinColorUniformity || 80);
 
-    const shapeScore = Math.max(40, aiAnalysis.shapeCharacteristics.symmetryRatio || 80);
-    const colorScore = Math.max(40, aiAnalysis.colorMetrics.skinColorUniformity || 80);
-
-    // Baseline calculation:
-    // 40% Defect-free surface + 30% Color & curing + 30% Shape regularity
-    const baseDefectScore = Math.max(0, 100 - defectPenaltyTotal * 4.5);
-    let qualityScore = Math.round(
-      baseDefectScore * 0.50 +
-      colorScore * 0.25 +
-      shapeScore * 0.25
-    );
-
+    const baseDefectScore = Math.max(0, 100 - defectPenaltyTotal * 5.0);
+    let qualityScore = Math.round(baseDefectScore * 0.50 + colorScore * 0.25 + shapeScore * 0.25);
     qualityScore = Math.max(10, Math.min(99, qualityScore));
 
-    // Determine Grade according to configurable standards
-    let grade: 'GRADE_A' | 'GRADE_B' | 'GRADE_C' | 'REJECT';
+    let grade: 'GRADE_A' | 'GRADE_B' | 'GRADE_C' | 'URS' | 'REJECT';
     let gradeName: string;
     let explanation: string;
+    let isGradeA = false;
 
-    if (hasCriticalDefect) {
-      grade = 'REJECT';
-      gradeName = 'Reject / Culled';
-      explanation = `Rejected due to critical defect condition: ${criticalDefectName}. Violates food safety / storage thresholds.`;
+    if (isURS) {
+      grade = 'URS';
+      gradeName = 'URS (Under-Rate Stock / Under-Sized & Reject)';
+      isGradeA = false;
+      qualityScore = Math.min(qualityScore, 48);
+      explanation = `Assigned as URS due to procurement defect condition: ${ursReason}. Disqualified from Fair Average Quality (FAQ) Grade A standard.`;
     } else if (
       qualityScore >= this.config.gradeA.minScore &&
-      totalDefectArea <= this.config.gradeA.maxDefectArea &&
+      totalDefectArea <= this.config.gradeA.maxDefectPercent &&
       shapeScore >= this.config.gradeA.minSymmetry
     ) {
       grade = 'GRADE_A';
-      gradeName = 'Grade A (Premium Export Quality)';
-      explanation = `Excellent specimen with high surface integrity (≤${this.config.gradeA.maxDefectArea}% blemishes), uniform coloring, and sound morphological symmetry.`;
-    } else if (
-      qualityScore >= this.config.gradeB.minScore &&
-      totalDefectArea <= this.config.gradeB.maxDefectArea &&
-      shapeScore >= this.config.gradeB.minSymmetry
-    ) {
+      gradeName = 'Grade A (FAQ / Premium Export Standard)';
+      isGradeA = true;
+      explanation = 'Meets Fair Average Quality (FAQ) Grade A benchmark: Cured dry tunics, intact neck closure, sound flesh, zero rot, zero sprouting, and standard size.';
+    } else if (qualityScore >= this.config.gradeB.minScore && totalDefectArea <= this.config.gradeB.maxDefectPercent) {
       grade = 'GRADE_B';
       gradeName = 'Grade B (Commercial Domestic Retail)';
-      explanation = `Good commercial quality with minor cosmetic surface blemishes within acceptable commercial tolerances.`;
-    } else if (
-      qualityScore >= this.config.gradeC.minScore &&
-      totalDefectArea <= this.config.gradeC.maxDefectArea
-    ) {
-      grade = 'GRADE_C';
-      gradeName = 'Grade C (Industrial Processing / Dicing)';
-      explanation = `Cosmetic defects or asymmetry exceed fresh retail appearance standards, but internal edible flesh is suitable for industrial peeling/dicing.`;
+      isGradeA = false;
+      explanation = 'Acceptable domestic commercial quality with minor superficial skin slip (<9%), but sound internal scales.';
     } else {
-      grade = 'REJECT';
-      gradeName = 'Reject / Culled';
-      explanation = `Severe cumulative skin defects (${totalDefectArea.toFixed(1)}% affected area) or structural distortion below commercial processing thresholds.`;
+      grade = 'URS';
+      gradeName = 'URS (Under-Rate Stock)';
+      isGradeA = false;
+      explanation = `Cumulative defects (${totalDefectArea.toFixed(1)}% affected area) fall below commercial table standards; classified as URS.`;
     }
 
-    // Confidence & Human Review Flagging
+    // Pricing estimation per quintal
+    let fairPriceRatePerQuintal = this.config.baseMspRatePerQuintal;
+    if (grade === 'GRADE_A') {
+      fairPriceRatePerQuintal += 250; // +₹250 premium for Grade A FAQ
+    } else if (grade === 'GRADE_B') {
+      fairPriceRatePerQuintal -= 150; // -₹150 for minor skin defects
+    } else {
+      fairPriceRatePerQuintal = Math.round(this.config.baseMspRatePerQuintal * 0.45); // URS discount
+    }
+
+    // Confidence & review flagging
     let needsHumanReview = false;
     let reviewReason: string | undefined;
 
     if (aiAnalysis.overallVegetableConfidence < threshold) {
       needsHumanReview = true;
-      reviewReason = `Low AI confidence (${aiAnalysis.overallVegetableConfidence}% < ${threshold}% threshold). Inspector verification required.`;
+      reviewReason = `Low AI confidence (${aiAnalysis.overallVegetableConfidence}% < ${threshold}% threshold). Inspector spot-check required to eliminate dispute.`;
     } else if (aiAnalysis.unreliableAttributes.length > 0) {
       needsHumanReview = true;
-      reviewReason = `Some physical attributes could not be reliably determined: ${aiAnalysis.unreliableAttributes.join(', ')}.`;
-    } else if (Math.abs(qualityScore - this.config.gradeA.minScore) <= 2 || Math.abs(qualityScore - this.config.gradeB.minScore) <= 2) {
+      reviewReason = `Physical attributes could not be reliably determined: ${aiAnalysis.unreliableAttributes.join(', ')}.`;
+    } else if (Math.abs(qualityScore - this.config.gradeA.minScore) <= 2) {
       needsHumanReview = true;
-      reviewReason = 'Borderline score between grade boundaries. Human spot-check recommended.';
+      reviewReason = 'Borderline score between Grade A and commercial grade. Joint review recommended.';
     }
 
     return {
       qualityScore,
       grade,
       gradeName,
+      isGradeA,
+      isURS: grade === 'URS' || isURS,
+      ursReason: isURS ? ursReason : undefined,
       explanation,
       needsHumanReview,
       reviewReason,
-      defectPenaltyTotal: Number(defectPenaltyTotal.toFixed(1)),
-      scoreBreakdown: {
-        shapeScore,
-        colorScore,
-        defectDeductions: Math.round(defectPenaltyTotal * 4.5),
-        confidenceFactor: aiAnalysis.overallVegetableConfidence,
-      },
+      fairPriceRatePerQuintal,
     };
   }
 }

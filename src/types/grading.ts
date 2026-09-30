@@ -1,10 +1,10 @@
 export type CropCategory = 'apple' | 'tomato' | 'pepper' | 'mango' | 'potato' | 'orange' | 'strawberry' | 'avocado';
 
-export type GradeTier = 'GRADE_A' | 'GRADE_B' | 'GRADE_C' | 'REJECT';
+export type GradeTier = 'GRADE_A' | 'GRADE_B' | 'GRADE_C' | 'URS' | 'REJECT';
 
 export interface DefectItem {
   id: string;
-  type: 'blemish' | 'bruise' | 'pest_sting' | 'sunscald' | 'rot' | 'misshapen' | 'mechanical_scar' | 'stem_tear';
+  type: string;
   label: string;
   severity: 'minor' | 'moderate' | 'critical';
   confidence: number;
@@ -14,7 +14,7 @@ export interface DefectItem {
     w: number;
     h: number;
   };
-  impactScore: number;
+  impactScore?: number;
 }
 
 export interface MetricBreakdown {
@@ -53,7 +53,7 @@ export interface InspectionResult {
     processingEligible: boolean;
   };
   recommendedRouting: {
-    market: 'Premium Export' | 'Domestic Retail' | 'Commercial Processing' | 'Livestock / Compost';
+    market: 'Premium Export' | 'Domestic Retail' | 'Commercial Processing' | 'Livestock / Compost' | 'URS Under-Rate';
     suggestedPricePerKg: number;
     rationale: string;
     valueRecoveryTips: string[];

@@ -40,6 +40,17 @@ export interface SizeEstimates {
   accuracyNote: string;
 }
 
+export interface HackathonDefectFlags {
+  isRotten: boolean;
+  isSprouted: boolean;
+  isDamaged: boolean;
+  isUndersized: boolean;
+  rottenDetails?: string;
+  sproutedDetails?: string;
+  damagedDetails?: string;
+  undersizedDetails?: string;
+}
+
 export interface AIAnalysisOutput {
   detectionPresent: boolean;
   vegetableDetected: string;
@@ -47,6 +58,7 @@ export interface AIAnalysisOutput {
   shapeCharacteristics: ShapeMetrics;
   colorMetrics: ColorMetrics;
   defectsDetected: DefectObservation[];
+  hackathonFlags: HackathonDefectFlags;
   sizeEstimates: SizeEstimates;
   overallVegetableConfidence: number; // 0-100
   confidenceRating: 'HIGH' | 'LOW';

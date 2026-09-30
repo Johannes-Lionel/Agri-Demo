@@ -1,4 +1,4 @@
-export type GradeTier = 'GRADE_A' | 'GRADE_B' | 'GRADE_C' | 'REJECT';
+export type GradeTier = 'GRADE_A' | 'GRADE_B' | 'GRADE_C' | 'URS' | 'REJECT';
 
 export type UserRole = 'inspector' | 'manager' | 'admin';
 
@@ -21,6 +21,17 @@ export interface DefectItem {
   estimatedAreaPercent: number;
 }
 
+export interface HackathonDefectFlags {
+  isRotten: boolean;
+  isSprouted: boolean;
+  isDamaged: boolean;
+  isUndersized: boolean;
+  rottenDetails?: string;
+  sproutedDetails?: string;
+  damagedDetails?: string;
+  undersizedDetails?: string;
+}
+
 export interface ImageQualityReport {
   width: number;
   height: number;
@@ -33,6 +44,16 @@ export interface ImageQualityReport {
   framingStatus: 'CENTERED' | 'OFF_CENTER';
   overallQualityPassed: boolean;
   warnings: string[];
+}
+
+export interface ProcurementSettlement {
+  baseMspPerQuintal: number; // e.g. ₹2,400 per 100kg
+  gradeAPremium: number;     // e.g. +₹250
+  ursPenalty: number;        // e.g. -₹450
+  finalRatePerQuintal: number;
+  estimatedLotWeightKg: number;
+  totalFarmerPayout: number;
+  transparencyAuditHash: string;
 }
 
 export interface InspectionRecord {
@@ -55,6 +76,7 @@ export interface InspectionRecord {
   status: 'completed' | 'needs_review' | 'reviewed' | 'rejected';
   createdAt: string;
   defects: DefectItem[];
+  hackathonFlags: HackathonDefectFlags;
   shape: {
     shapeType: string;
     symmetryRatio: number;
@@ -86,12 +108,23 @@ export interface BatchRecord {
   variety: string;
   growerOrigin: string;
   quantityInspected: number;
+  estimatedLotWeightKg?: number;
+  gradeAPercent: number;
+  ursPercent: number;
   gradeDistribution: {
     gradeA: number;
     gradeB: number;
     gradeC: number;
+    urs: number;
     reject: number;
   };
+  defectBreakdownSummary: {
+    rottenCount: number;
+    sproutedCount: number;
+    damagedCount: number;
+    undersizedCount: number;
+  };
+  settlement?: ProcurementSettlement;
   averageConfidence: number;
   averageScore: number;
   defectSummary: Record<string, number>;
@@ -124,15 +157,26 @@ export interface CertifiedReport {
   variety: string;
   growerOrigin: string;
   totalQuantity: number;
+  estimatedLotWeightKg?: number;
   certifiedGrade: GradeTier;
+  gradeAPercent: number;
+  ursPercent: number;
   averageScore: number;
   averageConfidence: number;
   gradeDistribution: {
     gradeA: number;
     gradeB: number;
     gradeC: number;
+    urs?: number;
     reject: number;
   };
+  defectBreakdownSummary?: {
+    rottenCount: number;
+    sproutedCount: number;
+    damagedCount: number;
+    undersizedCount: number;
+  };
+  settlement?: ProcurementSettlement;
   defectSummary: Record<string, number>;
   humanReviewCount: number;
   certifiedBy: string;
@@ -149,6 +193,8 @@ export interface VerificationRecord {
   vegetableType: string;
   variety: string;
   certifiedGrade: GradeTier;
+  gradeAPercent: number;
+  ursPercent: number;
   totalInspected: number;
   overallQualityScore: number;
   certificationDate: string;
@@ -164,4 +210,5 @@ export interface AppSettings {
   selectedModel: 'gemini-2.5-flash' | 'pytorch-yolo-produce';
   facilityName: string;
   inspectorName: string;
+  baseMspRate: number; // ₹ per quintal benchmark for fair procurement
 }

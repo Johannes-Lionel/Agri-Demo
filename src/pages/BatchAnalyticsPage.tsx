@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Layers, Plus, FileText, CheckCircle2, 
-  TrendingUp, Award, AlertCircle, ChevronRight, Sparkles 
+  TrendingUp, Award, AlertCircle, Scale, Sparkles, ShieldCheck 
 } from 'lucide-react';
 import { BatchRecord, InspectionRecord, CertifiedReport } from '../types';
 import { firestoreService } from '../services/firestoreService';
@@ -13,7 +13,7 @@ interface BatchAnalyticsPageProps {
   onOpenReport?: (reportId: string) => void;
 }
 
-export const BatchAnalyticsPage: React.FC<BatchAnalyticsPageProps> = ({ onNavigate, onOpenReport }) => {
+export const BatchAnalyticsPage: React.FC<BatchAnalyticsPageProps> = ({ onNavigate }) => {
   const [batches, setBatches] = useState<BatchRecord[]>([]);
   const [selectedBatch, setSelectedBatch] = useState<BatchRecord | null>(null);
   const [batchInspections, setBatchInspections] = useState<InspectionRecord[]>([]);
@@ -21,10 +21,11 @@ export const BatchAnalyticsPage: React.FC<BatchAnalyticsPageProps> = ({ onNaviga
   const [generatingReport, setGeneratingReport] = useState(false);
 
   // New batch form
-  const [newBatchNumber, setNewBatchNumber] = useState(`LOT-ON-2026-${Math.floor(100 + Math.random() * 900)}`);
+  const [newBatchNumber, setNewBatchNumber] = useState(`MANDI-LOT-${Math.floor(100 + Math.random() * 900)}`);
   const [newVegetable, setNewVegetable] = useState('onion');
-  const [newVariety, setNewVariety] = useState('Yellow Spanish Sweet');
-  const [newGrower, setNewGrower] = useState('Highland Allium Co-Op');
+  const [newVariety, setNewVariety] = useState('Nashik Red Onion');
+  const [newGrower, setNewGrower] = useState('Kisan Cooperative Society (Lot #4)');
+  const [newWeightKg, setNewWeightKg] = useState<number>(5000);
 
   useEffect(() => {
     loadBatches();
@@ -54,7 +55,16 @@ export const BatchAnalyticsPage: React.FC<BatchAnalyticsPageProps> = ({ onNaviga
       variety: newVariety,
       growerOrigin: newGrower,
       quantityInspected: 0,
-      gradeDistribution: { gradeA: 0, gradeB: 0, gradeC: 0, reject: 0 },
+      estimatedLotWeightKg: newWeightKg,
+      gradeAPercent: 0,
+      ursPercent: 0,
+      gradeDistribution: { gradeA: 0, gradeB: 0, gradeC: 0, urs: 0, reject: 0 },
+      defectBreakdownSummary: {
+        rottenCount: 0,
+        sproutedCount: 0,
+        damagedCount: 0,
+        undersizedCount: 0,
+      },
       averageConfidence: 0,
       averageScore: 0,
       defectSummary: {},
@@ -74,25 +84,30 @@ export const BatchAnalyticsPage: React.FC<BatchAnalyticsPageProps> = ({ onNaviga
     if (!selectedBatch) return;
     setGeneratingReport(true);
     try {
-      const reportId = `rep-${Date.now()}`;
+      const reportId = `rep-mandi-${Date.now()}`;
       const newReport: CertifiedReport = {
         id: reportId,
-        reportNumber: `CERT-AGRI-${selectedBatch.batchNumber.replace('LOT-', '')}`,
+        reportNumber: `CERT-MANDI-${selectedBatch.batchNumber.replace('MANDI-LOT-', '').replace('LOT-', '')}`,
         userId: 'usr-default',
         batchId: selectedBatch.id,
-        verificationId: `VER-AGRI-${Math.floor(1000 + Math.random() * 9000)}`,
+        verificationId: `VER-MANDI-${Math.floor(1000 + Math.random() * 9000)}`,
         vegetableType: selectedBatch.vegetableType,
         variety: selectedBatch.variety,
         growerOrigin: selectedBatch.growerOrigin,
         totalQuantity: selectedBatch.quantityInspected || 1,
-        certifiedGrade: (selectedBatch.gradeDistribution.gradeA > (selectedBatch.gradeDistribution.gradeB || 0)) ? 'GRADE_A' : 'GRADE_B',
+        estimatedLotWeightKg: selectedBatch.estimatedLotWeightKg || 4500,
+        certifiedGrade: selectedBatch.gradeAPercent >= 60 ? 'GRADE_A' : 'GRADE_B',
+        gradeAPercent: selectedBatch.gradeAPercent || 70,
+        ursPercent: selectedBatch.ursPercent || 10,
         averageScore: selectedBatch.averageScore || 88,
-        averageConfidence: selectedBatch.averageConfidence || 90,
+        averageConfidence: selectedBatch.averageConfidence || 91,
         gradeDistribution: selectedBatch.gradeDistribution,
+        defectBreakdownSummary: selectedBatch.defectBreakdownSummary,
+        settlement: selectedBatch.settlement,
         defectSummary: selectedBatch.defectSummary,
         humanReviewCount: selectedBatch.humanReviewCount,
-        certifiedBy: 'Dr. Sarah Lin (Lead Q/A Inspector)',
-        facilityName: 'AgriGrade Packhouse Facility #4',
+        certifiedBy: 'Dr. Sarah Lin (Lead Mandi Inspector)',
+        facilityName: 'AgriGrade Mandi Procurement Center #4',
         publicVerificationUrl: `/verify/${reportId}`,
         createdAt: new Date().toISOString(),
       };
@@ -113,14 +128,14 @@ export const BatchAnalyticsPage: React.FC<BatchAnalyticsPageProps> = ({ onNaviga
       <div className="bg-stone-900 border border-stone-800 rounded-3xl p-6 sm:p-8 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-semibold mb-2">
-            <Layers className="w-3.5 h-3.5" />
-            <span>Packhouse Harvest Batch Manager</span>
+            <Scale className="w-3.5 h-3.5" />
+            <span>Mandi Procurement Intake & Transparent Settlement</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-            Batch Analytics & Grade Distribution
+            Lot Settlement Ledger & Grade A / URS Yields
           </h1>
           <p className="text-xs text-stone-400 mt-1">
-            Aggregate quality statistics across delivery lots, defect frequencies, and certification reports.
+            Computing Grade A (FAQ) vs URS percentages and eliminating buyer-grower pricing disputes.
           </p>
         </div>
 
@@ -130,7 +145,7 @@ export const BatchAnalyticsPage: React.FC<BatchAnalyticsPageProps> = ({ onNaviga
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
-          <span>Open New Batch</span>
+          <span>Intake New Lot</span>
         </button>
       </div>
 
@@ -138,10 +153,10 @@ export const BatchAnalyticsPage: React.FC<BatchAnalyticsPageProps> = ({ onNaviga
       {isCreatingNew && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
           <div className="bg-stone-900 border border-stone-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
-            <h3 className="text-base font-bold text-white">Create New Harvest Lot Batch</h3>
+            <h3 className="text-base font-bold text-white">Intake New Procurement Lot</h3>
             <form onSubmit={handleCreateBatch} className="space-y-3">
               <div>
-                <label className="text-xs font-semibold text-stone-300 block mb-1">Batch Number</label>
+                <label className="text-xs font-semibold text-stone-300 block mb-1">Mandi Lot Identifier</label>
                 <input
                   type="text"
                   required
@@ -152,21 +167,7 @@ export const BatchAnalyticsPage: React.FC<BatchAnalyticsPageProps> = ({ onNaviga
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-stone-300 block mb-1">Vegetable Type</label>
-                <select
-                  value={newVegetable}
-                  onChange={(e) => setNewVegetable(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-stone-950 border border-stone-800 text-white text-xs"
-                >
-                  <option value="onion">Onion (Allium cepa)</option>
-                  <option value="potato">Potato</option>
-                  <option value="tomato">Tomato</option>
-                  <option value="pepper">Bell Pepper</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-stone-300 block mb-1">Cultivar / Variety</label>
+                <label className="text-xs font-semibold text-stone-300 block mb-1">Produce Cultivar</label>
                 <input
                   type="text"
                   required
@@ -177,13 +178,24 @@ export const BatchAnalyticsPage: React.FC<BatchAnalyticsPageProps> = ({ onNaviga
               </div>
 
               <div>
-                <label className="text-xs font-semibold text-stone-300 block mb-1">Grower / Orchard Origin</label>
+                <label className="text-xs font-semibold text-stone-300 block mb-1">Farmer / Grower Origin</label>
                 <input
                   type="text"
                   required
                   value={newGrower}
                   onChange={(e) => setNewGrower(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-stone-950 border border-stone-800 text-white text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-stone-300 block mb-1">Weighbridge Lot Weight (kg)</label>
+                <input
+                  type="number"
+                  required
+                  value={newWeightKg}
+                  onChange={(e) => setNewWeightKg(Number(e.target.value))}
+                  className="w-full px-3 py-2 rounded-xl bg-stone-950 border border-stone-800 text-white text-xs font-mono"
                 />
               </div>
 
@@ -199,7 +211,7 @@ export const BatchAnalyticsPage: React.FC<BatchAnalyticsPageProps> = ({ onNaviga
                   type="submit"
                   className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow"
                 >
-                  Create Batch
+                  Register Lot
                 </button>
               </div>
             </form>
@@ -207,12 +219,12 @@ export const BatchAnalyticsPage: React.FC<BatchAnalyticsPageProps> = ({ onNaviga
         </div>
       )}
 
-      {/* Main Grid: Batches on Left, Detailed Analytics on Right */}
+      {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Batches Selector List (4 cols) */}
+        {/* Batches List (4 cols) */}
         <div className="lg:col-span-4 space-y-3">
           <h3 className="text-xs font-bold text-stone-400 uppercase tracking-wider px-1">
-            Active Harvest Batches ({batches.length})
+            Registered Procurement Lots ({batches.length})
           </h3>
 
           <div className="space-y-2.5">
@@ -222,7 +234,7 @@ export const BatchAnalyticsPage: React.FC<BatchAnalyticsPageProps> = ({ onNaviga
                 <div
                   key={b.id}
                   onClick={() => handleSelectBatch(b)}
-                  className={`p-4 rounded-2xl border cursor-pointer transition space-y-1.5 ${
+                  className={`p-4 rounded-2xl border cursor-pointer transition space-y-2 ${
                     isSelected
                       ? 'bg-stone-850 border-emerald-500 text-white shadow-lg ring-1 ring-emerald-500/30'
                       : 'bg-stone-900 border-stone-800 text-stone-300 hover:bg-stone-850'
@@ -239,11 +251,11 @@ export const BatchAnalyticsPage: React.FC<BatchAnalyticsPageProps> = ({ onNaviga
                     </span>
                   </div>
                   <div className="text-xs font-semibold capitalize text-stone-200">
-                    {b.vegetableType} • {b.variety}
+                    {b.variety}
                   </div>
-                  <div className="text-[11px] text-stone-500 flex justify-between">
-                    <span>{b.quantityInspected} units inspected</span>
-                    <span className="font-mono text-emerald-400">{b.averageScore}/100</span>
+                  <div className="text-[11px] text-stone-400 flex justify-between font-mono">
+                    <span className="text-emerald-400 font-bold">Grade A: {b.gradeAPercent}%</span>
+                    <span className="text-rose-400 font-bold">URS: {b.ursPercent}%</span>
                   </div>
                 </div>
               );
@@ -251,87 +263,148 @@ export const BatchAnalyticsPage: React.FC<BatchAnalyticsPageProps> = ({ onNaviga
           </div>
         </div>
 
-        {/* Batch Detailed Analytics (8 cols) */}
+        {/* Selected Batch Details (8 cols) */}
         {selectedBatch && (
           <div className="lg:col-span-8 bg-stone-900 border border-stone-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-stone-800 pb-6">
               <div>
                 <div className="text-xs font-bold text-emerald-400 font-mono">{selectedBatch.batchNumber}</div>
                 <h2 className="text-2xl font-black text-white capitalize mt-0.5">
-                  {selectedBatch.vegetableType} ({selectedBatch.variety})
+                  {selectedBatch.variety}
                 </h2>
-                <p className="text-xs text-stone-400 mt-0.5">{selectedBatch.growerOrigin}</p>
+                <p className="text-xs text-stone-400 mt-0.5">
+                  Farmer: <strong className="text-stone-200">{selectedBatch.growerOrigin}</strong> • Weight: {selectedBatch.estimatedLotWeightKg || 4500} kg ({((selectedBatch.estimatedLotWeightKg || 4500) / 100).toFixed(1)} Quintals)
+                </p>
               </div>
 
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  disabled={generatingReport}
-                  onClick={handleGenerateReport}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition disabled:opacity-50"
-                >
-                  <FileText className="w-4 h-4" />
-                  <span>Generate Certified Report & QR</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                disabled={generatingReport}
+                onClick={handleGenerateReport}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 transition disabled:opacity-50"
+              >
+                <FileText className="w-4 h-4" />
+                <span>Generate Digital Mandi Slip & QR</span>
+              </button>
             </div>
 
-            {/* Batch Metrics Grid */}
+            {/* Grade A % vs URS % Key Highlight Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="p-4 rounded-xl bg-stone-950 border border-stone-800">
-                <span className="text-[10px] text-stone-500 uppercase font-bold block">Units Audited</span>
-                <span className="text-2xl font-black text-white font-mono">{selectedBatch.quantityInspected}</span>
+              <div className="p-4 rounded-2xl bg-stone-950 border border-emerald-500/30">
+                <span className="text-[10px] text-emerald-400 uppercase font-bold block">Grade A (FAQ) Yield</span>
+                <span className="text-3xl font-black text-emerald-400 font-mono">{selectedBatch.gradeAPercent}%</span>
+                <div className="text-[10px] text-stone-500 mt-0.5">{selectedBatch.gradeDistribution.gradeA} FAQ units</div>
               </div>
-              <div className="p-4 rounded-xl bg-stone-950 border border-stone-800">
-                <span className="text-[10px] text-stone-500 uppercase font-bold block">Average Quality Score</span>
-                <span className="text-2xl font-black text-emerald-400 font-mono">{selectedBatch.averageScore}<span className="text-xs text-stone-500">/100</span></span>
+
+              <div className="p-4 rounded-2xl bg-stone-950 border border-rose-500/30">
+                <span className="text-[10px] text-rose-400 uppercase font-bold block">URS Percentage</span>
+                <span className="text-3xl font-black text-rose-400 font-mono">{selectedBatch.ursPercent}%</span>
+                <div className="text-[10px] text-stone-500 mt-0.5">{selectedBatch.gradeDistribution.urs} URS units</div>
               </div>
-              <div className="p-4 rounded-xl bg-stone-950 border border-stone-800">
-                <span className="text-[10px] text-stone-500 uppercase font-bold block">Mean AI Confidence</span>
-                <span className="text-2xl font-black text-blue-400 font-mono">{selectedBatch.averageConfidence}%</span>
+
+              <div className="p-4 rounded-2xl bg-stone-950 border border-stone-800">
+                <span className="text-[10px] text-stone-500 uppercase font-bold block">Quality Index</span>
+                <span className="text-3xl font-black text-white font-mono">{selectedBatch.averageScore}<span className="text-xs text-stone-500">/100</span></span>
+                <div className="text-[10px] text-stone-500 mt-0.5">Mean defect penalty</div>
               </div>
-              <div className="p-4 rounded-xl bg-stone-950 border border-stone-800">
-                <span className="text-[10px] text-stone-500 uppercase font-bold block">Human Reviews</span>
-                <span className="text-2xl font-black text-amber-400 font-mono">{selectedBatch.humanReviewCount}</span>
+
+              <div className="p-4 rounded-2xl bg-stone-950 border border-stone-800">
+                <span className="text-[10px] text-stone-500 uppercase font-bold block">Confidence Level</span>
+                <span className="text-3xl font-black text-blue-400 font-mono">{selectedBatch.averageConfidence}%</span>
+                <div className="text-[10px] text-stone-500 mt-0.5">High precision rating</div>
               </div>
             </div>
 
-            {/* Grade Breakdown in this Batch */}
-            <div className="p-5 rounded-2xl bg-stone-950 border border-stone-800 space-y-4">
+            {/* 4 Hackathon Defect Quantities in this Lot */}
+            <div className="p-5 rounded-2xl bg-stone-950 border border-stone-800 space-y-3">
               <h4 className="text-xs font-bold text-stone-300 uppercase tracking-wider flex items-center gap-2">
-                <Award className="w-4 h-4 text-emerald-400" />
-                Batch Packout Grade Ratio
+                <AlertCircle className="w-4 h-4 text-amber-400" />
+                Detected Defect Occurrences in this Lot:
               </h4>
 
-              <div className="grid grid-cols-4 gap-2 text-center text-xs">
-                <div className="bg-stone-900 p-3 rounded-xl border border-emerald-500/20">
-                  <div className="text-emerald-400 font-bold">Grade A</div>
-                  <div className="text-lg font-black text-white font-mono mt-1">{selectedBatch.gradeDistribution.gradeA}</div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div className="p-3 rounded-xl bg-stone-900 border border-stone-800/80">
+                  <span className="text-rose-400 font-bold block">🛑 Rotten Count:</span>
+                  <span className="font-mono text-lg font-black text-white mt-1">
+                    {selectedBatch.defectBreakdownSummary?.rottenCount ?? 3}
+                  </span>
+                  <span className="text-[10px] text-stone-500 block">Fungal neck/basal rot</span>
                 </div>
-                <div className="bg-stone-900 p-3 rounded-xl border border-blue-500/20">
-                  <div className="text-blue-400 font-bold">Grade B</div>
-                  <div className="text-lg font-black text-white font-mono mt-1">{selectedBatch.gradeDistribution.gradeB}</div>
+
+                <div className="p-3 rounded-xl bg-stone-900 border border-stone-800/80">
+                  <span className="text-amber-400 font-bold block">🌱 Sprouted Count:</span>
+                  <span className="font-mono text-lg font-black text-white mt-1">
+                    {selectedBatch.defectBreakdownSummary?.sproutedCount ?? 4}
+                  </span>
+                  <span className="text-[10px] text-stone-500 block">Vegetative shoots</span>
                 </div>
-                <div className="bg-stone-900 p-3 rounded-xl border border-amber-500/20">
-                  <div className="text-amber-400 font-bold">Grade C</div>
-                  <div className="text-lg font-black text-white font-mono mt-1">{selectedBatch.gradeDistribution.gradeC}</div>
+
+                <div className="p-3 rounded-xl bg-stone-900 border border-stone-800/80">
+                  <span className="text-blue-400 font-bold block">✂️ Damaged Count:</span>
+                  <span className="font-mono text-lg font-black text-white mt-1">
+                    {selectedBatch.defectBreakdownSummary?.damagedCount ?? 6}
+                  </span>
+                  <span className="text-[10px] text-stone-500 block">Mechanical cuts & abrasions</span>
                 </div>
-                <div className="bg-stone-900 p-3 rounded-xl border border-rose-500/20">
-                  <div className="text-rose-400 font-bold">Reject</div>
-                  <div className="text-lg font-black text-white font-mono mt-1">{selectedBatch.gradeDistribution.reject}</div>
+
+                <div className="p-3 rounded-xl bg-stone-900 border border-stone-800/80">
+                  <span className="text-purple-400 font-bold block">📏 Undersized Count:</span>
+                  <span className="font-mono text-lg font-black text-white mt-1">
+                    {selectedBatch.defectBreakdownSummary?.undersizedCount ?? 2}
+                  </span>
+                  <span className="text-[10px] text-stone-500 block">&lt;45mm caliber culls</span>
                 </div>
               </div>
             </div>
 
-            {/* Inspections in this batch */}
+            {/* Transparent Mandi Settlement Calculator */}
+            <div className="p-5 rounded-2xl bg-gradient-to-r from-stone-950 via-stone-950 to-emerald-950/30 border border-emerald-500/30 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <Scale className="w-4 h-4 text-emerald-400" />
+                    Automated Fair Price Payout Settlement
+                  </h4>
+                  <p className="text-[11px] text-stone-400">
+                    Transparent formula based on Grade A FAQ bonus minus URS defect deductions.
+                  </p>
+                </div>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                  Zero Agent Bias
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div className="p-3 rounded-xl bg-stone-900">
+                  <span className="text-[10px] text-stone-500 block">Base Benchmark MSP</span>
+                  <span className="font-mono font-bold text-stone-200">₹2,400 / quintal</span>
+                </div>
+                <div className="p-3 rounded-xl bg-stone-900">
+                  <span className="text-[10px] text-emerald-400 block">Grade A FAQ Bonus</span>
+                  <span className="font-mono font-bold text-emerald-400">+₹250 / quintal</span>
+                </div>
+                <div className="p-3 rounded-xl bg-stone-900">
+                  <span className="text-[10px] text-rose-400 block">URS Deduction ({selectedBatch.ursPercent}%)</span>
+                  <span className="font-mono font-bold text-rose-400">-₹{Math.round(selectedBatch.ursPercent * 28)} / quintal</span>
+                </div>
+                <div className="p-3 rounded-xl bg-emerald-950/80 border border-emerald-500/40">
+                  <span className="text-[10px] text-emerald-300 block font-bold">Net Payout to Farmer</span>
+                  <span className="font-mono text-base font-black text-emerald-300">
+                    ₹{selectedBatch.settlement?.totalFarmerPayout ? selectedBatch.settlement.totalFarmerPayout.toLocaleString() : '106,200'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Individual Specimens */}
             <div className="space-y-3">
               <h4 className="text-xs font-bold text-stone-300 uppercase tracking-wider">
-                Audited Specimens in Batch ({batchInspections.length})
+                Audited Specimens in this Procurement Lot ({batchInspections.length})
               </h4>
 
               {batchInspections.length === 0 ? (
                 <div className="p-6 text-center rounded-xl bg-stone-950 text-xs text-stone-500 border border-stone-800">
-                  No individual inspections logged in this batch yet.
+                  No individual inspections logged in this lot yet.
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -343,8 +416,8 @@ export const BatchAnalyticsPage: React.FC<BatchAnalyticsPageProps> = ({ onNaviga
                           <span className="font-mono text-[11px] text-stone-300 font-bold">{insp.id}</span>
                           <GradeBadge grade={insp.grade} size="sm" />
                         </div>
-                        <div className="text-[10px] text-stone-500 mt-0.5">
-                          Score: {insp.qualityScore}/100 • Conf: {insp.confidenceScore}%
+                        <div className="text-[10px] text-stone-400 mt-0.5">
+                          Score: {insp.qualityScore}/100 • {insp.hackathonFlags?.isRotten ? 'Rotten' : insp.hackathonFlags?.isSprouted ? 'Sprouted' : insp.hackathonFlags?.isUndersized ? 'Undersized' : 'Grade A FAQ'}
                         </div>
                       </div>
                     </div>

@@ -1,14 +1,13 @@
 import { 
   collection, doc, getDoc, getDocs, setDoc, updateDoc, 
-  query, where, orderBy 
+  query, where 
 } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { db } from '../lib/firebase';
 import { 
   InspectionRecord, BatchRecord, HumanReviewRecord, 
-  CertifiedReport, VerificationRecord, UserProfile 
+  CertifiedReport, VerificationRecord 
 } from '../types';
 
-// Pre-seeded initial onion data for immediate productivity
 export const INITIAL_BATCHES: BatchRecord[] = [
   {
     id: 'batch-on-881',
@@ -18,11 +17,30 @@ export const INITIAL_BATCHES: BatchRecord[] = [
     variety: 'Yellow Spanish Sweet Onion',
     growerOrigin: 'Treasure Valley Alliums (Plot 4)',
     quantityInspected: 125,
+    estimatedLotWeightKg: 4500,
+    gradeAPercent: 65.6,
+    ursPercent: 12.0,
     gradeDistribution: {
       gradeA: 82,
       gradeB: 28,
-      gradeC: 11,
-      reject: 4,
+      gradeC: 0,
+      urs: 15,
+      reject: 0,
+    },
+    defectBreakdownSummary: {
+      rottenCount: 3,
+      sproutedCount: 4,
+      damagedCount: 6,
+      undersizedCount: 2,
+    },
+    settlement: {
+      baseMspPerQuintal: 2400,
+      gradeAPremium: 250,
+      ursPenalty: 380,
+      finalRatePerQuintal: 2360,
+      estimatedLotWeightKg: 4500,
+      totalFarmerPayout: 106200,
+      transparencyAuditHash: 'SHA256-AGRI-881-FAQ-OK',
     },
     averageConfidence: 89.4,
     averageScore: 86.2,
@@ -30,9 +48,9 @@ export const INITIAL_BATCHES: BatchRecord[] = [
       'Superficial Skin Slip': 18,
       'Minor Basal Scar': 8,
       'Sunscald Greening': 4,
-      'Aspergillus Black Mold': 2,
+      'Aspergillus Black Mold': 3,
     },
-    humanReviewCount: 3,
+    humanReviewCount: 1,
     status: 'open',
     createdAt: '2026-09-28T09:30:00.000Z',
     updatedAt: '2026-09-29T16:45:00.000Z',
@@ -45,11 +63,30 @@ export const INITIAL_BATCHES: BatchRecord[] = [
     variety: 'Red Creole Bulb',
     growerOrigin: 'Red River Allium Cooperative',
     quantityInspected: 240,
+    estimatedLotWeightKg: 8200,
+    gradeAPercent: 72.9,
+    ursPercent: 8.3,
     gradeDistribution: {
       gradeA: 175,
       gradeB: 45,
-      gradeC: 14,
-      reject: 6,
+      gradeC: 0,
+      urs: 20,
+      reject: 0,
+    },
+    defectBreakdownSummary: {
+      rottenCount: 5,
+      sproutedCount: 3,
+      damagedCount: 8,
+      undersizedCount: 4,
+    },
+    settlement: {
+      baseMspPerQuintal: 2400,
+      gradeAPremium: 250,
+      ursPenalty: 210,
+      finalRatePerQuintal: 2440,
+      estimatedLotWeightKg: 8200,
+      totalFarmerPayout: 200080,
+      transparencyAuditHash: 'SHA256-AGRI-879-FAQ-OK',
     },
     averageConfidence: 92.1,
     averageScore: 89.8,
@@ -91,16 +128,22 @@ export const INITIAL_INSPECTIONS: InspectionRecord[] = [
     confidenceScore: 94,
     needsHumanReview: false,
     grade: 'GRADE_A',
-    gradeName: 'Grade A (Premium Export Quality)',
+    gradeName: 'Grade A (FAQ / Export Quality)',
     qualityScore: 94,
     explanation: 'Uniform golden skin tunic, intact dry neck closure, clean basal plate. Calibrated diameter 74mm within Jumbo specification.',
     status: 'completed',
     createdAt: '2026-09-29T10:15:00.000Z',
+    hackathonFlags: {
+      isRotten: false,
+      isSprouted: false,
+      isDamaged: false,
+      isUndersized: false,
+    },
     defects: [
       {
         id: 'def-1',
         type: 'skin_peeling',
-        label: 'Minor Papery Flake (<5%)',
+        label: 'Minor Papery Flake (<3%)',
         severity: 'minor',
         locationDesc: 'Apical shoulder',
         confidence: 91,
@@ -126,7 +169,7 @@ export const INITIAL_INSPECTIONS: InspectionRecord[] = [
       accuracyNote: 'Calibrated using physical coin marker',
     },
     unreliableAttributes: [],
-    rawObservations: 'Zero vegetative sprout shoots detected. Turgid internal scales, dry papery wrapper.',
+    rawObservations: 'Zero vegetative sprout shoots detected. Turgid internal scales, dry papery wrapper. Passed Grade A FAQ.',
     aiModelUsed: 'Gemini 2.5 Flash Vision Inspector',
   },
   {
@@ -152,17 +195,24 @@ export const INITIAL_INSPECTIONS: InspectionRecord[] = [
     },
     confidenceScore: 72,
     needsHumanReview: true,
-    humanReviewReason: 'Low AI confidence (72% < 80% threshold). Ambiguous dark pigmentation near neck.',
+    humanReviewReason: 'Low AI confidence (72% < 80% threshold). Ambiguous dark pigmentation near neck collar.',
     grade: 'GRADE_B',
     gradeName: 'Grade B (Commercial Domestic Retail)',
     qualityScore: 74,
     explanation: 'Localized discoloration near the dried neck. Requires manual tactile check to ensure dryness.',
     status: 'needs_review',
     createdAt: '2026-09-29T11:40:00.000Z',
+    hackathonFlags: {
+      isRotten: false,
+      isSprouted: false,
+      isDamaged: true,
+      isUndersized: false,
+      damagedDetails: 'Superficial neck discoloration (not active rot)',
+    },
     defects: [
       {
         id: 'def-2',
-        type: 'neck_discoloration',
+        type: 'damage',
         label: 'Localized Dark Pigment at Neck Collar',
         severity: 'moderate',
         locationDesc: 'Neck boundary',
@@ -204,14 +254,33 @@ export const INITIAL_REPORTS: CertifiedReport[] = [
     variety: 'Red Creole Bulb',
     growerOrigin: 'Red River Allium Cooperative',
     totalQuantity: 240,
+    estimatedLotWeightKg: 8200,
     certifiedGrade: 'GRADE_A',
+    gradeAPercent: 72.9,
+    ursPercent: 8.3,
     averageScore: 89.8,
     averageConfidence: 92.1,
     gradeDistribution: {
       gradeA: 175,
       gradeB: 45,
-      gradeC: 14,
-      reject: 6,
+      gradeC: 0,
+      urs: 20,
+      reject: 0,
+    },
+    defectBreakdownSummary: {
+      rottenCount: 5,
+      sproutedCount: 3,
+      damagedCount: 8,
+      undersizedCount: 4,
+    },
+    settlement: {
+      baseMspPerQuintal: 2400,
+      gradeAPremium: 250,
+      ursPenalty: 210,
+      finalRatePerQuintal: 2440,
+      estimatedLotWeightKg: 8200,
+      totalFarmerPayout: 200080,
+      transparencyAuditHash: 'SHA256-AGRI-879-FAQ-OK',
     },
     defectSummary: {
       'Superficial Skin Slip': 24,
@@ -235,23 +304,23 @@ export const INITIAL_VERIFICATIONS: VerificationRecord[] = [
     vegetableType: 'Onion (Dry Bulb)',
     variety: 'Red Creole Bulb',
     certifiedGrade: 'GRADE_A',
+    gradeAPercent: 72.9,
+    ursPercent: 8.3,
     totalInspected: 240,
     overallQualityScore: 89.8,
     certificationDate: '2026-09-27',
-    issuer: 'AgriGrade Certification Authority',
+    issuer: 'AgriGrade Mandi Certification Authority',
     facilityName: 'AgriGrade Regional Packhouse #4',
     isValid: true,
   },
 ];
 
-// In-memory caching & sync layer
 let memoryBatches = [...INITIAL_BATCHES];
 let memoryInspections = [...INITIAL_INSPECTIONS];
 let memoryReports = [...INITIAL_REPORTS];
 let memoryVerifications = [...INITIAL_VERIFICATIONS];
 
 export const firestoreService = {
-  // Batches
   async getBatches(userId?: string): Promise<BatchRecord[]> {
     try {
       const q = userId
@@ -264,7 +333,7 @@ export const firestoreService = {
         return fetched;
       }
     } catch (err) {
-      console.warn('Firestore getBatches fallback to memory:', err);
+      console.warn('Firestore getBatches fallback:', err);
     }
     return memoryBatches;
   },
@@ -297,7 +366,6 @@ export const firestoreService = {
     }
   },
 
-  // Inspections
   async getInspections(batchId?: string): Promise<InspectionRecord[]> {
     try {
       const q = batchId
@@ -325,6 +393,44 @@ export const firestoreService = {
     } catch (err) {
       console.warn('Failed to write inspection to Firestore:', err);
     }
+
+    // Update parent batch statistics if batchId is provided
+    if (inspection.batchId) {
+      const batch = memoryBatches.find((b) => b.id === inspection.batchId);
+      if (batch) {
+        const bInsps = memoryInspections.filter((i) => i.batchId === batch.id);
+        const count = bInsps.length;
+        const gA = bInsps.filter((i) => i.grade === 'GRADE_A').length;
+        const gB = bInsps.filter((i) => i.grade === 'GRADE_B').length;
+        const gURS = bInsps.filter((i) => i.grade === 'URS' || i.grade === 'REJECT').length;
+        const gradeAPct = Number(((gA / count) * 100).toFixed(1));
+        const ursPct = Number(((gURS / count) * 100).toFixed(1));
+
+        const rot = bInsps.filter((i) => i.hackathonFlags?.isRotten).length;
+        const spr = bInsps.filter((i) => i.hackathonFlags?.isSprouted).length;
+        const dam = bInsps.filter((i) => i.hackathonFlags?.isDamaged).length;
+        const und = bInsps.filter((i) => i.hackathonFlags?.isUndersized).length;
+
+        await this.updateBatch(batch.id, {
+          quantityInspected: count,
+          gradeAPercent: gradeAPct,
+          ursPercent: ursPct,
+          gradeDistribution: {
+            gradeA: gA,
+            gradeB: gB,
+            gradeC: 0,
+            urs: gURS,
+            reject: 0,
+          },
+          defectBreakdownSummary: {
+            rottenCount: rot,
+            sproutedCount: spr,
+            damagedCount: dam,
+            undersizedCount: und,
+          },
+        });
+      }
+    }
   },
 
   async updateInspection(id: string, partial: Partial<InspectionRecord>): Promise<void> {
@@ -336,7 +442,6 @@ export const firestoreService = {
     }
   },
 
-  // Human Reviews
   async getPendingReviews(): Promise<InspectionRecord[]> {
     const all = await this.getInspections();
     return all.filter((i) => i.status === 'needs_review' || i.needsHumanReview);
@@ -349,7 +454,6 @@ export const firestoreService = {
       console.warn('Failed to write humanReview to Firestore:', err);
     }
 
-    // Update inspection status
     await this.updateInspection(review.inspectionId, {
       grade: review.finalGrade,
       status: 'reviewed',
@@ -357,7 +461,6 @@ export const firestoreService = {
     });
   },
 
-  // Reports
   async getReports(): Promise<CertifiedReport[]> {
     try {
       const snap = await getDocs(collection(db, 'reports'));
@@ -390,7 +493,6 @@ export const firestoreService = {
       console.warn('Failed to write report to Firestore:', err);
     }
 
-    // Also write public verification record
     const verRecord: VerificationRecord = {
       id: report.id,
       reportId: report.id,
@@ -399,6 +501,8 @@ export const firestoreService = {
       vegetableType: report.vegetableType,
       variety: report.variety,
       certifiedGrade: report.certifiedGrade,
+      gradeAPercent: report.gradeAPercent || 80,
+      ursPercent: report.ursPercent || 10,
       totalInspected: report.totalQuantity,
       overallQualityScore: report.averageScore,
       certificationDate: report.createdAt.split('T')[0],
@@ -409,7 +513,6 @@ export const firestoreService = {
     await this.createVerificationRecord(verRecord);
   },
 
-  // Verification Records (Public QR code reader)
   async getVerificationRecord(reportId: string): Promise<VerificationRecord | null> {
     try {
       const snap = await getDoc(doc(db, 'verificationRecords', reportId));

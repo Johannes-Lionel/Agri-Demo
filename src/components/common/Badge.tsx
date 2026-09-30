@@ -1,5 +1,5 @@
 import React from 'react';
-import { GradeTier } from '../../types/grading';
+import { GradeTier } from '../../types/index';
 
 interface GradeBadgeProps {
   grade: GradeTier;
@@ -8,32 +8,39 @@ interface GradeBadgeProps {
 }
 
 export const GradeBadge: React.FC<GradeBadgeProps> = ({ grade, size = 'md', showSubtitle = false }) => {
-  const configs = {
+  const configs: Record<GradeTier, { bg: string; label: string; sub: string; glow: string; dot: string }> = {
     GRADE_A: {
       bg: 'bg-emerald-950/80 text-emerald-400 border-emerald-500/40',
       label: 'Grade A',
-      sub: 'Export Quality',
+      sub: 'FAQ Export Quality',
       glow: 'shadow-[0_0_15px_rgba(16,185,129,0.25)]',
       dot: 'bg-emerald-400',
     },
     GRADE_B: {
       bg: 'bg-blue-950/80 text-blue-400 border-blue-500/40',
       label: 'Grade B',
-      sub: 'Domestic Retail',
+      sub: 'Domestic Commercial',
       glow: 'shadow-[0_0_15px_rgba(59,130,246,0.25)]',
       dot: 'bg-blue-400',
     },
     GRADE_C: {
       bg: 'bg-amber-950/80 text-amber-400 border-amber-500/40',
       label: 'Grade C',
-      sub: 'Processing / Puree',
+      sub: 'Processing / Dicing',
       glow: 'shadow-[0_0_15px_rgba(245,158,11,0.25)]',
       dot: 'bg-amber-400',
     },
+    URS: {
+      bg: 'bg-rose-950/90 text-rose-300 border-rose-500/50',
+      label: 'URS (Under-Rate Stock)',
+      sub: 'Undersized / Defective',
+      glow: 'shadow-[0_0_15px_rgba(244,63,94,0.3)]',
+      dot: 'bg-rose-400',
+    },
     REJECT: {
       bg: 'bg-rose-950/80 text-rose-400 border-rose-500/40',
-      label: 'Reject / Culled',
-      sub: 'Defective / Spoiled',
+      label: 'URS / Rejected',
+      sub: 'Rotten / Sprouted Cull',
       glow: 'shadow-[0_0_15px_rgba(244,63,94,0.25)]',
       dot: 'bg-rose-400',
     },

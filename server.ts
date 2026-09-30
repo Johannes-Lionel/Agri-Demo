@@ -1,8 +1,8 @@
 import express from 'express';
 import cors from 'cors';
-import { GeminiVegetableAIService, PyTorchYOLOVegetableAIService } from './server/aiService';
-import { VegetableGradingEngine } from './server/gradingEngine';
-import { IVegetableAIService } from './server/aiTypes';
+import { GeminiVegetableAIService, PyTorchYOLOVegetableAIService } from './server/aiService.ts';
+import { VegetableGradingEngine } from './server/gradingEngine.ts';
+import type { IVegetableAIService } from './server/aiTypes.ts';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   app.use(cors());
   app.use(express.json({ limit: '25mb' }));
@@ -104,7 +104,7 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     app.use(express.static(path.resolve(__dirname, 'dist')));
-    app.get('*', (req, res) => {
+    app.use((req, res) => {
       res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
     });
   }
