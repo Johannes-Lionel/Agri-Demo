@@ -1,0 +1,171 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Registered AgriGrade user or inspector profile",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "displayName": { "type": "string", "maxLength": 128 },
+        "role": { "type": "string", "enum": ["inspector", "manager", "admin"] },
+        "facilityName": { "type": "string", "maxLength": 256 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "email", "role", "createdAt"]
+    },
+    "Batch": {
+      "title": "Batch",
+      "description": "A collection of vegetable inspections from a harvest or delivery lot",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "batchNumber": { "type": "string", "maxLength": 64 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "vegetableType": { "type": "string", "maxLength": 64 },
+        "variety": { "type": "string", "maxLength": 128 },
+        "growerOrigin": { "type": "string", "maxLength": 256 },
+        "quantityInspected": { "type": "number" },
+        "gradeDistribution": { "type": "object" },
+        "averageConfidence": { "type": "number" },
+        "averageScore": { "type": "number" },
+        "defectSummary": { "type": "object" },
+        "humanReviewCount": { "type": "number" },
+        "status": { "type": "string", "enum": ["open", "review_pending", "certified", "archived"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "batchNumber", "userId", "vegetableType", "status", "createdAt"]
+    },
+    "Inspection": {
+      "title": "Inspection",
+      "description": "Individual vegetable quality inspection record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "batchId": { "type": "string", "maxLength": 128 },
+        "vegetableType": { "type": "string", "maxLength": 64 },
+        "variety": { "type": "string", "maxLength": 128 },
+        "imageUrl": { "type": "string" },
+        "calibrationUsed": { "type": "boolean" },
+        "calibrationReferenceType": { "type": "string", "maxLength": 64 },
+        "imageQuality": { "type": "object" },
+        "confidenceScore": { "type": "number" },
+        "needsHumanReview": { "type": "boolean" },
+        "humanReviewReason": { "type": "string", "maxLength": 512 },
+        "grade": { "type": "string", "enum": ["GRADE_A", "GRADE_B", "GRADE_C", "REJECT"] },
+        "qualityScore": { "type": "number" },
+        "status": { "type": "string", "enum": ["completed", "needs_review", "reviewed", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "vegetableType", "confidenceScore", "grade", "qualityScore", "status", "createdAt"]
+    },
+    "AnalysisResult": {
+      "title": "AnalysisResult",
+      "description": "Detailed AI computer vision and grading engine payload",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "inspectionId": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "aiModelProvider": { "type": "string", "maxLength": 64 },
+        "detectionPresent": { "type": "boolean" },
+        "shapeCharacteristics": { "type": "object" },
+        "colorMetrics": { "type": "object" },
+        "defectsDetected": { "type": "array" },
+        "sizeEstimates": { "type": "object" },
+        "gradingBreakdown": { "type": "object" },
+        "rawExplanation": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "inspectionId", "userId", "aiModelProvider", "detectionPresent", "createdAt"]
+    },
+    "HumanReview": {
+      "title": "HumanReview",
+      "description": "Manual quality inspector review for low confidence or flagged inspections",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "inspectionId": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "inspectorUid": { "type": "string", "maxLength": 128 },
+        "inspectorName": { "type": "string", "maxLength": 128 },
+        "originalGrade": { "type": "string", "maxLength": 32 },
+        "finalGrade": { "type": "string", "enum": ["GRADE_A", "GRADE_B", "GRADE_C", "REJECT"] },
+        "decision": { "type": "string", "enum": ["accepted", "overridden", "re-inspected"] },
+        "notes": { "type": "string", "maxLength": 1024 },
+        "reviewedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "inspectionId", "inspectorUid", "finalGrade", "decision", "reviewedAt"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "Certified Digital Inspection Report for a batch or lot",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "reportNumber": { "type": "string", "maxLength": 64 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "batchId": { "type": "string", "maxLength": 128 },
+        "verificationId": { "type": "string", "maxLength": 128 },
+        "vegetableType": { "type": "string", "maxLength": 64 },
+        "summary": { "type": "object" },
+        "certifiedBy": { "type": "string", "maxLength": 128 },
+        "publicVerificationUrl": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "reportNumber", "userId", "batchId", "verificationId", "vegetableType", "createdAt"]
+    },
+    "VerificationRecord": {
+      "title": "VerificationRecord",
+      "description": "Publicly accessible, tamper-evident verification record for QR code validation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "reportId": { "type": "string", "maxLength": 128 },
+        "reportNumber": { "type": "string", "maxLength": 64 },
+        "batchNumber": { "type": "string", "maxLength": 64 },
+        "vegetableType": { "type": "string", "maxLength": 64 },
+        "variety": { "type": "string", "maxLength": 128 },
+        "certifiedGrade": { "type": "string", "maxLength": 32 },
+        "totalInspected": { "type": "number" },
+        "overallQualityScore": { "type": "number" },
+        "certificationDate": { "type": "string" },
+        "issuer": { "type": "string", "maxLength": 128 },
+        "isValid": { "type": "boolean" }
+      },
+      "required": ["id", "reportId", "reportNumber", "vegetableType", "certifiedGrade", "isValid", "certificationDate"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles and permissions"
+    },
+    "/batches/{batchId}": {
+      "schema": { "$ref": "#/entities/Batch" },
+      "description": "Vegetable harvest and inspection batches"
+    },
+    "/inspections/{inspectionId}": {
+      "schema": { "$ref": "#/entities/Inspection" },
+      "description": "Individual vegetable quality inspection entries"
+    },
+    "/analysisResults/{analysisId}": {
+      "schema": { "$ref": "#/entities/AnalysisResult" },
+      "description": "Computer vision analysis data and grading engine outputs"
+    },
+    "/humanReviews/{reviewId}": {
+      "schema": { "$ref": "#/entities/HumanReview" },
+      "description": "Inspector review records for flagged produce"
+    },
+    "/reports/{reportId}": {
+      "schema": { "$ref": "#/entities/Report" },
+      "description": "Certified digital quality and dispatch reports"
+    },
+    "/verificationRecords/{recordId}": {
+      "schema": { "$ref": "#/entities/VerificationRecord" },
+      "description": "Public verification metadata accessible via QR code links without exposing private user data"
+    }
+  }
+}

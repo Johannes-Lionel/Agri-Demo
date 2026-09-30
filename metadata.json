@@ -1,0 +1,8 @@
+{
+  "name": "AgriGrade - Agricultural Produce Quality Grading System",
+  "description": "Smart agricultural produce quality grading, automated visual defect inspection, batch grading certification, and crop market yield valuation for growers and cooperatives.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
